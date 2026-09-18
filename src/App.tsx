@@ -1,20 +1,119 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { format, subDays, addDays, startOfWeek, startOfMonth, endOfMonth, eachDayOfInterval, isToday as isTodayFn, getDay } from 'date-fns';
-import { Plus, X, Trash2, Edit3, ChevronLeft, ChevronRight, Droplets, UtensilsCrossed, Bell, Check, Flame, Calendar, BarChart3, Undo2, Sun, Moon, Sunrise, Sparkles } from 'lucide-react';
+import { format, subDays, addDays, subMonths, addMonths, startOfWeek, startOfMonth, endOfMonth, eachDayOfInterval, isToday as isTodayFn, getDay } from 'date-fns';
+import { Plus, X, Trash2, Edit3, ChevronLeft, ChevronRight, Droplets, UtensilsCrossed, Bell, Check, Flame, Calendar, BarChart3, Undo2, Sun, Moon, Sunrise, Sparkles, Download, Upload, Volume2, VolumeX, Command } from 'lucide-react';
 import { useHabits } from './hooks/useHabits';
 import { Habit, TimeOfDay, Weekday, HABIT_COLORS, TIME_OF_DAY_LABELS, WEEKDAY_NAMES } from './types';
 import confetti from 'canvas-confetti';
 
+// ===== SOUND EFFECTS =====
+function playCheckSound() {
+  try {
+    const ctx = new (window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext)();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.frequency.setValueAtTime(600, ctx.currentTime);
+    osc.frequency.exponentialRampToValueAtTime(900, ctx.currentTime + 0.1);
+    osc.type = 'sine';
+    gain.gain.setValueAtTime(0.15, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.15);
+    osc.start(ctx.currentTime);
+    osc.stop(ctx.currentTime + 0.15);
+  } catch { /* ignore */ }
+}
+
+function playUncheckSound() {
+  try {
+    const ctx = new (window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext)();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.frequency.setValueAtTime(400, ctx.currentTime);
+    osc.frequency.exponentialRampToValueAtTime(250, ctx.currentTime + 0.1);
+    osc.type = 'sine';
+    gain.gain.setValueAtTime(0.1, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.1);
+    osc.start(ctx.currentTime);
+    osc.stop(ctx.currentTime + 0.1);
+  } catch { /* ignore */ }
+}
+
+// ===== 3D TILT CARD =====
+function TiltCard({ children, className = '', intensity = 5 }: { children: React.ReactNode; className?: string; intensity?: number }) {
+  const ref = useRef<HTMLDivElement>(null);
+
+  const handleMouseMove = (e: React.MouseEvent) => {
+    if (!ref.current) return;
+    const rect = ref.current.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+    const centerX = rect.width / 2;
+    const centerY = rect.height / 2;
+    const rotateX = ((y - centerY) / centerY) * -intensity;
+    const rotateY = ((x - centerX) / centerX) * intensity;
+    ref.current.style.transform = `perspective(800px) rotateX(${rotateX}deg) rotateY(${rotateY}deg) scale3d(1.01, 1.01, 1.01)`;
+  };
+
+  const handleMouseLeave = () => {
+    if (!ref.current) return;
+    ref.current.style.transform = 'perspective(800px) rotateX(0deg) rotateY(0deg) scale3d(1, 1, 1)';
+  };
+
+  return (
+    <div
+      ref={ref}
+      className={`transition-transform duration-200 ease-out ${className}`}
+      onMouseMove={handleMouseMove}
+      onMouseLeave={handleMouseLeave}
+    >
+      {children}
+    </div>
+  );
+}
+
+// ===== SHIMMER PROGRESS BAR =====
+function ShimmerProgress({ percent, className = '' }: { percent: number; className?: string }) {
+  return (
+    <div className={`h-3 bg-gray-100 rounded-full overflow-hidden relative ${className}`}>
+      <motion.div
+        className="h-full bg-gradient-to-r from-orange-400 to-amber-400 rounded-full relative overflow-hidden"
+        initial={{ width: 0 }}
+        animate={{ width: `${percent}%` }}
+        transition={{ type: 'spring', stiffness: 100, damping: 20 }}
+      >
+        {/* Shimmer effect */}
+        <motion.div
+          className="absolute inset-0 bg-gradient-to-r from-transparent via-white/40 to-transparent"
+          animate={{ x: ['-100%', '200%'] }}
+          transition={{ duration: 2, repeat: Infinity, ease: 'easeInOut', repeatDelay: 1 }}
+        />
+      </motion.div>
+    </div>
+  );
+}
+
+// ===== MOTIVATIONAL GREETING =====
+function getGreeting(): { text: string; emoji: string } {
+  const hour = new Date().getHours();
+  if (hour < 6) return { text: 'Still up? Rest well.', emoji: '🌙' };
+  if (hour < 12) return { text: 'Good morning! Ready to kindle your day?', emoji: '🌅' };
+  if (hour < 17) return { text: 'Afternoon — keep the flame alive.', emoji: '☀️' };
+  if (hour < 21) return { text: 'Evening — how did your day go?', emoji: '🌇' };
+  return { text: 'Night owl — reflect on your wins.', emoji: '✨' };
+}
+
 // ===== EMBER BACKGROUND =====
 function EmberBackground() {
-  const embers = Array.from({ length: 15 }, (_, i) => ({
+  const embers = useMemo(() => Array.from({ length: 15 }, (_, i) => ({
     id: i,
     x: Math.random() * 100,
     delay: Math.random() * 8,
     duration: 8 + Math.random() * 12,
     size: 2 + Math.random() * 4,
-  }));
+  })), []);
 
   return (
     <div className="fixed inset-0 pointer-events-none overflow-hidden z-0">
@@ -251,9 +350,10 @@ function WeekView({ habits, weekDays, todayStr, isHabitCompleted, isHabitActiveO
   getStreak: (id: string) => number;
 }) {
   const handleCheck = (habitId: string, date: string) => {
-    toggleHabit(habitId, date);
     const wasCompleted = isHabitCompleted(habitId, date);
+    toggleHabit(habitId, date);
     if (!wasCompleted) {
+      playCheckSound();
       // Small confetti burst
       confetti({
         particleCount: 8,
@@ -265,6 +365,8 @@ function WeekView({ habits, weekDays, todayStr, isHabitCompleted, isHabitActiveO
         gravity: 1.5,
         scalar: 0.8,
       });
+    } else {
+      playUncheckSound();
     }
   };
 
@@ -389,11 +491,11 @@ function MonthView({ habits, logs, isHabitActiveOnDate, isHabitCompleted }: {
       animate={{ opacity: 1, y: 0 }}
     >
       <div className="flex items-center justify-between mb-4">
-        <button onClick={() => setCurrentMonth(subDays(currentMonth, 30))} className="p-1.5 rounded-lg hover:bg-gray-100">
+        <button onClick={() => setCurrentMonth(subMonths(currentMonth, 1))} className="p-1.5 rounded-lg hover:bg-gray-100 transition-colors">
           <ChevronLeft className="w-4 h-4 text-gray-500" />
         </button>
         <h2 className="font-bold text-gray-800">{format(currentMonth, 'MMMM yyyy')}</h2>
-        <button onClick={() => setCurrentMonth(addDays(currentMonth, 30))} className="p-1.5 rounded-lg hover:bg-gray-100">
+        <button onClick={() => setCurrentMonth(addMonths(currentMonth, 1))} className="p-1.5 rounded-lg hover:bg-gray-100 transition-colors">
           <ChevronRight className="w-4 h-4 text-gray-500" />
         </button>
       </div>
@@ -806,6 +908,11 @@ export default function App() {
   const [showReminders, setShowReminders] = useState(false);
   const [reminderToast, setReminderToast] = useState<string | null>(null);
   const [waterGoal, setWaterGoal] = useState(8);
+  const [darkMode, setDarkMode] = useState(false);
+  const [showShortcuts, setShowShortcuts] = useState(false);
+  const [showMenu, setShowMenu] = useState(false);
+  
+  const greeting = useMemo(() => getGreeting(), []);
 
   // Update document title
   useEffect(() => {
@@ -826,6 +933,94 @@ export default function App() {
     const interval = setInterval(checkReminders, 60000);
     return () => clearInterval(interval);
   }, [reminders]);
+
+  // Keyboard shortcuts
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
+      
+      switch (e.key.toLowerCase()) {
+        case 'n':
+          if (!e.ctrlKey && !e.metaKey) {
+            e.preventDefault();
+            setEditingHabit(undefined);
+            setShowHabitForm(true);
+          }
+          break;
+        case 'w':
+          if (!e.ctrlKey && !e.metaKey) {
+            e.preventDefault();
+            setView('week');
+          }
+          break;
+        case 'm':
+          if (!e.ctrlKey && !e.metaKey) {
+            e.preventDefault();
+            setView('month');
+          }
+          break;
+        case 'd':
+          if (!e.ctrlKey && !e.metaKey) {
+            e.preventDefault();
+            setDarkMode(prev => !prev);
+          }
+          break;
+        case '?':
+          e.preventDefault();
+          setShowShortcuts(prev => !prev);
+          break;
+        case 'escape':
+          setShowHabitForm(false);
+          setSelectedHabit(null);
+          setShowReminders(false);
+          setShowShortcuts(false);
+          setShowMenu(false);
+          break;
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
+
+  // Data export
+  const exportData = () => {
+    const data = {
+      habits,
+      logs,
+      waterLogs: JSON.parse(localStorage.getItem('kindling-water') || '[]'),
+      mealLogs: JSON.parse(localStorage.getItem('kindling-meals') || '[]'),
+      reminders,
+      exportedAt: new Date().toISOString(),
+    };
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `kindling-backup-${format(new Date(), 'yyyy-MM-dd')}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  // Data import
+  const importData = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      try {
+        const data = JSON.parse(event.target?.result as string);
+        if (data.habits) localStorage.setItem('kindling-habits', JSON.stringify(data.habits));
+        if (data.logs) localStorage.setItem('kindling-logs', JSON.stringify(data.logs));
+        if (data.waterLogs) localStorage.setItem('kindling-water', JSON.stringify(data.waterLogs));
+        if (data.mealLogs) localStorage.setItem('kindling-meals', JSON.stringify(data.mealLogs));
+        if (data.reminders) localStorage.setItem('kindling-reminders', JSON.stringify(data.reminders));
+        window.location.reload();
+      } catch {
+        alert('Invalid backup file');
+      }
+    };
+    reader.readAsText(file);
+  };
 
   const handleAddHabit = (data: Omit<Habit, 'id' | 'createdAt'>) => {
     if (editingHabit) {
@@ -849,7 +1044,11 @@ export default function App() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-amber-50 via-orange-50 to-rose-50 relative">
+    <div className={`min-h-screen relative transition-colors duration-500 ${
+      darkMode 
+        ? 'bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900' 
+        : 'bg-gradient-to-br from-amber-50 via-orange-50 to-rose-50'
+    }`}>
       <EmberBackground />
 
       {/* Reminder toasts */}
@@ -877,87 +1076,150 @@ export default function App() {
       </AnimatePresence>
 
       {/* Main content */}
-      <div className="relative z-10 max-w-lg mx-auto px-4 py-6">
+      <div className={`relative z-10 max-w-lg mx-auto px-4 py-6 transition-colors duration-300 ${darkMode ? 'dark' : ''}`}>
         {/* Header */}
         <motion.header
-          className="flex items-center justify-between mb-6"
+          className="mb-6"
           initial={{ opacity: 0, y: -10 }}
           animate={{ opacity: 1, y: 0 }}
         >
-          <div className="flex items-center gap-2">
-            <FlameIcon />
-            <h1 className="text-2xl font-bold text-gray-800">Kindling</h1>
+          <div className="flex items-center justify-between mb-2">
+            <div className="flex items-center gap-2">
+              <FlameIcon />
+              <h1 className={`text-2xl font-bold ${darkMode ? 'text-gray-100' : 'text-gray-800'}`}>Kindling</h1>
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setShowShortcuts(true)}
+                className={`w-9 h-9 rounded-full ${darkMode ? 'bg-gray-800/60 text-gray-300 hover:bg-gray-700/80' : 'bg-white/60 text-gray-500 hover:bg-white/80'} backdrop-blur-sm flex items-center justify-center transition-all`}
+                title="Keyboard shortcuts (?)"
+              >
+                <Command className="w-4 h-4" />
+              </button>
+              <button
+                onClick={() => setShowMenu(!showMenu)}
+                className={`w-9 h-9 rounded-full ${darkMode ? 'bg-gray-800/60 text-gray-300 hover:bg-gray-700/80' : 'bg-white/60 text-gray-500 hover:bg-white/80'} backdrop-blur-sm flex items-center justify-center transition-all`}
+              >
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 5v.01M12 12v.01M12 19v.01" />
+                </svg>
+              </button>
+              <button
+                onClick={() => { setEditingHabit(undefined); setShowHabitForm(true); }}
+                className="w-9 h-9 rounded-full bg-orange-500 text-white flex items-center justify-center shadow-lg shadow-orange-200 hover:shadow-xl hover:scale-105 transition-all"
+                title="New habit (N)"
+              >
+                <Plus className="w-4 h-4" />
+              </button>
+            </div>
           </div>
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => setShowReminders(!showReminders)}
-              className="w-9 h-9 rounded-full bg-white/60 backdrop-blur-sm flex items-center justify-center text-gray-500 hover:text-gray-700 hover:bg-white/80 transition-all"
-            >
-              <Bell className="w-4 h-4" />
-            </button>
-            <button
-              onClick={() => { setEditingHabit(undefined); setShowHabitForm(true); }}
-              className="w-9 h-9 rounded-full bg-orange-500 text-white flex items-center justify-center shadow-lg shadow-orange-200 hover:shadow-xl hover:scale-105 transition-all"
-            >
-              <Plus className="w-4 h-4" />
-            </button>
-          </div>
+          {/* Greeting */}
+          <motion.p
+            className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-500'} ml-8`}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.2 }}
+          >
+            {greeting.emoji} {greeting.text}
+          </motion.p>
+
+          {/* Dropdown menu */}
+          <AnimatePresence>
+            {showMenu && (
+              <motion.div
+                className={`absolute right-4 mt-2 ${darkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'} rounded-2xl shadow-xl border p-2 z-50 min-w-[180px]`}
+                initial={{ opacity: 0, y: -10, scale: 0.95 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                exit={{ opacity: 0, y: -10, scale: 0.95 }}
+              >
+                <button
+                  onClick={() => { setDarkMode(!darkMode); setShowMenu(false); }}
+                  className={`w-full flex items-center gap-2 px-3 py-2 rounded-xl text-sm ${darkMode ? 'text-gray-200 hover:bg-gray-700' : 'text-gray-700 hover:bg-gray-100'} transition-colors`}
+                >
+                  {darkMode ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
+                  {darkMode ? 'Light mode' : 'Dark mode'}
+                  <span className="ml-auto text-xs opacity-50">D</span>
+                </button>
+                <button
+                  onClick={() => { setShowReminders(true); setShowMenu(false); }}
+                  className={`w-full flex items-center gap-2 px-3 py-2 rounded-xl text-sm ${darkMode ? 'text-gray-200 hover:bg-gray-700' : 'text-gray-700 hover:bg-gray-100'} transition-colors`}
+                >
+                  <Bell className="w-4 h-4" />
+                  Reminders
+                </button>
+                <div className={`my-1 border-t ${darkMode ? 'border-gray-700' : 'border-gray-100'}`} />
+                <button
+                  onClick={() => { exportData(); setShowMenu(false); }}
+                  className={`w-full flex items-center gap-2 px-3 py-2 rounded-xl text-sm ${darkMode ? 'text-gray-200 hover:bg-gray-700' : 'text-gray-700 hover:bg-gray-100'} transition-colors`}
+                >
+                  <Download className="w-4 h-4" />
+                  Export data
+                </button>
+                <label
+                  className={`w-full flex items-center gap-2 px-3 py-2 rounded-xl text-sm ${darkMode ? 'text-gray-200 hover:bg-gray-700' : 'text-gray-700 hover:bg-gray-100'} transition-colors cursor-pointer`}
+                >
+                  <Upload className="w-4 h-4" />
+                  Import data
+                  <input type="file" accept=".json" onChange={importData} className="hidden" />
+                </label>
+              </motion.div>
+            )}
+          </AnimatePresence>
         </motion.header>
 
         {/* Today's progress */}
-        <motion.div
-          className="bg-white/70 backdrop-blur-md rounded-3xl p-5 shadow-lg border border-white/50 mb-4"
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.1 }}
-        >
-          <div className="flex items-center justify-between mb-3">
-            <div>
-              <h2 className="font-bold text-gray-800">Today</h2>
-              <p className="text-sm text-gray-500">{format(new Date(), 'EEEE, MMMM d')}</p>
+        <TiltCard className="mb-4">
+          <motion.div
+            className={`${darkMode ? 'bg-gray-800/70 border-gray-700/50' : 'bg-white/70 border-white/50'} backdrop-blur-md rounded-3xl p-5 shadow-lg border`}
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.1 }}
+          >
+            <div className="flex items-center justify-between mb-3">
+              <div>
+                <h2 className={`font-bold ${darkMode ? 'text-gray-100' : 'text-gray-800'}`}>Today</h2>
+                <p className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>{format(new Date(), 'EEEE, MMMM d')}</p>
+              </div>
+              <div className="text-right">
+                <div className={`text-2xl font-bold ${darkMode ? 'text-gray-100' : 'text-gray-800'}`}>{todayProgress}%</div>
+                <div className={`text-xs ${darkMode ? 'text-gray-500' : 'text-gray-400'}`}>{todayCompletedHabits.length}/{todayActiveHabits.length} done</div>
+              </div>
             </div>
-            <div className="text-right">
-              <div className="text-2xl font-bold text-gray-800">{todayProgress}%</div>
-              <div className="text-xs text-gray-400">{todayCompletedHabits.length}/{todayActiveHabits.length} done</div>
-            </div>
-          </div>
-          {/* Progress bar */}
-          <div className="h-3 bg-gray-100 rounded-full overflow-hidden">
-            <motion.div
-              className="h-full bg-gradient-to-r from-orange-400 to-amber-400 rounded-full"
-              initial={{ width: 0 }}
-              animate={{ width: `${todayProgress}%` }}
-              transition={{ type: 'spring', stiffness: 100, damping: 20 }}
-            />
-          </div>
-          {todayProgress === 100 && todayActiveHabits.length > 0 && (
-            <motion.div
-              className="mt-2 text-center text-sm text-emerald-600 font-medium"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-            >
-              🎉 All habits complete! Amazing day!
-            </motion.div>
-          )}
-        </motion.div>
+            {/* Progress bar */}
+            <ShimmerProgress percent={todayProgress} />
+            {todayProgress === 100 && todayActiveHabits.length > 0 && (
+              <motion.div
+                className="mt-2 text-center text-sm text-emerald-600 font-medium"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+              >
+                🎉 All habits complete! Amazing day!
+              </motion.div>
+            )}
+          </motion.div>
+        </TiltCard>
 
         {/* View toggle */}
         <div className="flex gap-2 mb-4">
           <button
             onClick={() => setView('week')}
             className={`flex-1 py-2.5 rounded-xl text-sm font-medium transition-all flex items-center justify-center gap-2 ${
-              view === 'week' ? 'bg-white shadow-md text-gray-800' : 'text-gray-500 hover:bg-white/50'
+              view === 'week' 
+                ? darkMode ? 'bg-gray-800 shadow-md text-gray-100' : 'bg-white shadow-md text-gray-800'
+                : darkMode ? 'text-gray-400 hover:bg-gray-800/50' : 'text-gray-500 hover:bg-white/50'
             }`}
           >
-            <Calendar className="w-4 h-4" /> Week
+            <Calendar className="w-4 h-4" /> Week <span className="text-xs opacity-50 hidden sm:inline">(W)</span>
           </button>
           <button
             onClick={() => setView('month')}
             className={`flex-1 py-2.5 rounded-xl text-sm font-medium transition-all flex items-center justify-center gap-2 ${
-              view === 'month' ? 'bg-white shadow-md text-gray-800' : 'text-gray-500 hover:bg-white/50'
+              view === 'month' 
+                ? darkMode ? 'bg-gray-800 shadow-md text-gray-100' : 'bg-white shadow-md text-gray-800'
+                : darkMode ? 'text-gray-400 hover:bg-gray-800/50' : 'text-gray-500 hover:bg-white/50'
             }`}
           >
-            <BarChart3 className="w-4 h-4" /> Month
+            <BarChart3 className="w-4 h-4" /> Month <span className="text-xs opacity-50 hidden sm:inline">(M)</span>
           </button>
         </div>
 
@@ -1135,6 +1397,104 @@ export default function App() {
                 <Plus className="w-4 h-4" /> Add Reminder
               </button>
             </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Keyboard shortcuts dialog */}
+      <AnimatePresence>
+        {showShortcuts && (
+          <motion.div
+            className="fixed inset-0 bg-black/30 backdrop-blur-sm flex items-center justify-center z-50 p-4"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={() => setShowShortcuts(false)}
+          >
+            <motion.div
+              className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-3xl p-6 w-full max-w-sm shadow-2xl`}
+              initial={{ scale: 0.9 }}
+              animate={{ scale: 1 }}
+              exit={{ scale: 0.9 }}
+              onClick={e => e.stopPropagation()}
+            >
+              <div className="flex items-center justify-between mb-4">
+                <h2 className={`text-lg font-bold ${darkMode ? 'text-gray-100' : 'text-gray-800'}`}>Keyboard Shortcuts</h2>
+                <button onClick={() => setShowShortcuts(false)} className={`p-1.5 rounded-lg ${darkMode ? 'hover:bg-gray-700' : 'hover:bg-gray-100'}`}>
+                  <X className={`w-5 h-5 ${darkMode ? 'text-gray-400' : 'text-gray-400'}`} />
+                </button>
+              </div>
+              <div className="space-y-2">
+                {[
+                  { key: 'N', desc: 'New habit' },
+                  { key: 'W', desc: 'Week view' },
+                  { key: 'M', desc: 'Month view' },
+                  { key: 'D', desc: 'Toggle dark mode' },
+                  { key: '?', desc: 'Show shortcuts' },
+                  { key: 'Esc', desc: 'Close dialogs' },
+                ].map(s => (
+                  <div key={s.key} className="flex items-center justify-between py-1.5">
+                    <span className={`text-sm ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}>{s.desc}</span>
+                    <kbd className={`px-2 py-1 rounded-lg text-xs font-mono font-bold ${darkMode ? 'bg-gray-700 text-gray-200' : 'bg-gray-100 text-gray-700'}`}>{s.key}</kbd>
+                  </div>
+                ))}
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Weekly Summary */}
+      <AnimatePresence>
+        {view === 'week' && (
+          <motion.div
+            className="fixed bottom-4 left-4 right-4 max-w-lg mx-auto z-20"
+            initial={{ y: 100, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            exit={{ y: 100, opacity: 0 }}
+            transition={{ delay: 0.5 }}
+          >
+            <TiltCard className="bg-white/80 backdrop-blur-md rounded-2xl p-3 shadow-lg border border-white/50">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <span className="text-lg">📊</span>
+                  <div>
+                    <div className={`text-xs font-medium ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>This week</div>
+                    <div className={`text-[10px] ${darkMode ? 'text-gray-500' : 'text-gray-400'}`}>
+                      {(() => {
+                        const weekCompleted = weekDays.reduce((acc, day) => {
+                          const dateStr = format(day, 'yyyy-MM-dd');
+                          return acc + habits.filter(h => isHabitActiveOnDate(h, day) && isHabitCompleted(h.id, dateStr)).length;
+                        }, 0);
+                        const weekTotal = weekDays.reduce((acc, day) => {
+                          return acc + habits.filter(h => isHabitActiveOnDate(h, day)).length;
+                        }, 0);
+                        const pct = weekTotal > 0 ? Math.round((weekCompleted / weekTotal) * 100) : 0;
+                        return `${weekCompleted}/${weekTotal} habits • ${pct}%`;
+                      })()}
+                    </div>
+                  </div>
+                </div>
+                <div className="flex gap-1">
+                  {weekDays.map(day => {
+                    const dateStr = format(day, 'yyyy-MM-dd');
+                    const active = habits.filter(h => isHabitActiveOnDate(h, day));
+                    const completed = active.filter(h => isHabitCompleted(h.id, dateStr));
+                    const pct = active.length > 0 ? completed.length / active.length : 0;
+                    return (
+                      <div
+                        key={dateStr}
+                        className="w-2 h-6 rounded-full"
+                        style={{
+                          backgroundColor: `rgba(16, 185, 129, ${0.1 + pct * 0.8})`,
+                        }}
+                        title={`${format(day, 'EEE')}: ${completed.length}/${active.length}`}
+                      />
+                    );
+                  })}
+                </div>
+              </div>
+            </TiltCard>
           </motion.div>
         )}
       </AnimatePresence>
