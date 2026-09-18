@@ -935,6 +935,362 @@ function SoundSelector({ selectedSound, onSelectSound }: {
   );
 }
 
+// ===== HABIT STACKING BUILDER =====
+function HabitStackingBuilder({ habitStacks, habits, onAddStack, onDeleteStack }: {
+  habitStacks: Array<{ id: string; name: string; habits: string[]; createdAt: string }>;
+  habits: Habit[];
+  onAddStack: (name: string, habitIds: string[]) => void;
+  onDeleteStack: (id: string) => void;
+}) {
+  const [showForm, setShowForm] = useState(false);
+  const [stackName, setStackName] = useState('');
+  const [selectedHabits, setSelectedHabits] = useState<string[]>([]);
+  
+  const activeHabits = habits.filter(h => !h.archived);
+  
+  const handleAddHabit = (habitId: string) => {
+    if (!selectedHabits.includes(habitId)) {
+      setSelectedHabits([...selectedHabits, habitId]);
+    }
+  };
+  
+  const handleRemoveHabit = (habitId: string) => {
+    setSelectedHabits(selectedHabits.filter(id => id !== habitId));
+  };
+  
+  const handleSubmit = () => {
+    if (stackName.trim() && selectedHabits.length >= 2) {
+      onAddStack(stackName, selectedHabits);
+      setStackName('');
+      setSelectedHabits([]);
+      setShowForm(false);
+    }
+  };
+  
+  return (
+    <div className="bg-gradient-to-br from-cyan-50 to-blue-100 rounded-2xl p-4 shadow-sm border border-cyan-200">
+      <div className="flex items-center justify-between mb-3">
+        <div className="flex items-center gap-2">
+          <span className="text-2xl">🔗</span>
+          <h3 className="font-bold text-gray-800">Habit Stacking</h3>
+        </div>
+        <button
+          onClick={() => setShowForm(!showForm)}
+          className="text-sm text-cyan-600 hover:text-cyan-700 font-medium"
+        >
+          {showForm ? 'Cancel' : '+ New Stack'}
+        </button>
+      </div>
+      
+      {showForm && (
+        <motion.div
+          initial={{ opacity: 0, height: 0 }}
+          animate={{ opacity: 1, height: 'auto' }}
+          className="mb-3 space-y-3"
+        >
+          <input
+            type="text"
+            value={stackName}
+            onChange={(e) => setStackName(e.target.value)}
+            placeholder="Stack name (e.g., Morning Routine)"
+            className="w-full p-2 border border-cyan-200 rounded-lg text-sm"
+          />
+          
+          <div>
+            <div className="text-xs text-gray-600 mb-2">Select habits in order (minimum 2):</div>
+            <div className="space-y-1 max-h-40 overflow-y-auto">
+              {activeHabits.map((habit) => (
+                <button
+                  key={habit.id}
+                  onClick={() => {
+                    if (selectedHabits.includes(habit.id)) {
+                      handleRemoveHabit(habit.id);
+                    } else {
+                      handleAddHabit(habit.id);
+                    }
+                  }}
+                  className={`w-full p-2 rounded-lg text-left text-sm transition-all ${
+                    selectedHabits.includes(habit.id)
+                      ? 'bg-cyan-500 text-white'
+                      : 'bg-white/60 hover:bg-white/80 text-gray-700'
+                  }`}
+                >
+                  <span className="mr-2">{habit.icon}</span>
+                  {habit.name}
+                  {selectedHabits.includes(habit.id) && (
+                    <span className="float-right">#{selectedHabits.indexOf(habit.id) + 1}</span>
+                  )}
+                </button>
+              ))}
+            </div>
+          </div>
+          
+          {selectedHabits.length >= 2 && (
+            <div className="bg-white/60 rounded-lg p-2">
+              <div className="text-xs text-gray-600 mb-1">Your stack:</div>
+              <div className="flex items-center gap-1 flex-wrap">
+                {selectedHabits.map((id, idx) => {
+                  const habit = habits.find(h => h.id === id);
+                  return (
+                    <div key={id} className="flex items-center gap-1">
+                      <span className="text-sm">{habit?.icon} {habit?.name}</span>
+                      {idx < selectedHabits.length - 1 && <span className="text-gray-400">→</span>}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+          
+          <button
+            onClick={handleSubmit}
+            disabled={!stackName.trim() || selectedHabits.length < 2}
+            className="w-full py-2 bg-cyan-600 text-white text-sm rounded-lg hover:bg-cyan-700 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            Create Stack
+          </button>
+        </motion.div>
+      )}
+      
+      <div className="space-y-2 max-h-60 overflow-y-auto">
+        {habitStacks.length === 0 && !showForm && (
+          <div className="text-center text-sm text-gray-500 py-4">
+            No habit stacks yet. Chain habits together!
+          </div>
+        )}
+        {habitStacks.map((stack) => (
+          <motion.div
+            key={stack.id}
+            className="bg-white/60 rounded-lg p-3"
+            whileHover={{ scale: 1.02 }}
+          >
+            <div className="flex items-start justify-between gap-2 mb-2">
+              <div className="font-semibold text-gray-800 text-sm">{stack.name}</div>
+              <button
+                onClick={() => onDeleteStack(stack.id)}
+                className="text-xs text-red-500 hover:text-red-600"
+              >
+                Delete
+              </button>
+            </div>
+            <div className="flex items-center gap-1 flex-wrap text-xs">
+              {stack.habits.map((id, idx) => {
+                const habit = habits.find(h => h.id === id);
+                return (
+                  <div key={id} className="flex items-center gap-1">
+                    <span>{habit?.icon} {habit?.name}</span>
+                    {idx < stack.habits.length - 1 && <span className="text-gray-400">→</span>}
+                  </div>
+                );
+              })}
+            </div>
+          </motion.div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ===== STREAK RECOVERY MODE =====
+function StreakRecoveryMode({ streakRecoveries, habits, onMarkRecovered }: {
+  streakRecoveries: Array<{ habitId: string; brokenAt: string; recoveredAt?: string; message: string }>;
+  habits: Habit[];
+  onMarkRecovered: (habitId: string) => void;
+}) {
+  const activeRecoveries = streakRecoveries.filter(r => !r.recoveredAt);
+  
+  if (activeRecoveries.length === 0) return null;
+  
+  return (
+    <div className="bg-gradient-to-br from-rose-50 to-pink-100 rounded-2xl p-4 shadow-sm border border-rose-200">
+      <div className="flex items-center gap-2 mb-3">
+        <span className="text-2xl">💝</span>
+        <h3 className="font-bold text-gray-800">Streak Recovery</h3>
+      </div>
+      
+      <div className="space-y-2">
+        {activeRecoveries.map((recovery) => {
+          const habit = habits.find(h => h.id === recovery.habitId);
+          if (!habit) return null;
+          
+          return (
+            <motion.div
+              key={recovery.habitId}
+              className="bg-white/60 rounded-lg p-3"
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+            >
+              <div className="flex items-start gap-3">
+                <div className="text-3xl">{habit.icon}</div>
+                <div className="flex-1">
+                  <div className="font-semibold text-gray-800 text-sm mb-1">{habit.name}</div>
+                  <div className="text-xs text-gray-600 italic mb-2">{recovery.message}</div>
+                  <button
+                    onClick={() => onMarkRecovered(recovery.habitId)}
+                    className="px-3 py-1 bg-rose-500 text-white text-xs rounded hover:bg-rose-600"
+                  >
+                    I'm Back On Track ✓
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+// ===== HABIT CORRELATIONS =====
+function HabitCorrelations({ correlations, habits }: {
+  correlations: Array<{ habitId1: string; habitId2: string; correlation: number; strength: 'weak' | 'moderate' | 'strong' }>;
+  habits: Habit[];
+}) {
+  if (correlations.length === 0) {
+    return (
+      <div className="bg-gradient-to-br from-violet-50 to-purple-100 rounded-2xl p-4 shadow-sm border border-violet-200">
+        <div className="flex items-center gap-2 mb-3">
+          <span className="text-2xl">🔬</span>
+          <h3 className="font-bold text-gray-800">Habit Correlations</h3>
+        </div>
+        <div className="text-center text-sm text-gray-500 py-4">
+          Complete more habits to discover patterns!
+        </div>
+      </div>
+    );
+  }
+  
+  const getStrengthColor = (strength: string) => {
+    switch (strength) {
+      case 'strong': return 'text-green-600 bg-green-100';
+      case 'moderate': return 'text-yellow-600 bg-yellow-100';
+      default: return 'text-gray-600 bg-gray-100';
+    }
+  };
+  
+  return (
+    <div className="bg-gradient-to-br from-violet-50 to-purple-100 rounded-2xl p-4 shadow-sm border border-violet-200">
+      <div className="flex items-center gap-2 mb-3">
+        <span className="text-2xl">🔬</span>
+        <h3 className="font-bold text-gray-800">Habit Correlations</h3>
+      </div>
+      
+      <div className="space-y-2 max-h-60 overflow-y-auto">
+        {correlations.slice(0, 5).map((corr, idx) => {
+          const habit1 = habits.find(h => h.id === corr.habitId1);
+          const habit2 = habits.find(h => h.id === corr.habitId2);
+          if (!habit1 || !habit2) return null;
+          
+          const isPositive = corr.correlation > 0;
+          
+          return (
+            <motion.div
+              key={idx}
+              className="bg-white/60 rounded-lg p-3"
+              whileHover={{ scale: 1.02 }}
+            >
+              <div className="flex items-center gap-2 mb-2">
+                <span className="text-lg">{habit1.icon}</span>
+                <span className="text-xs text-gray-500">↔</span>
+                <span className="text-lg">{habit2.icon}</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <div className="text-xs text-gray-600">
+                  {isPositive ? 'When you do one, you tend to do the other' : 'When you do one, you tend to skip the other'}
+                </div>
+                <div className={`text-xs px-2 py-0.5 rounded ${getStrengthColor(corr.strength)}`}>
+                  {corr.strength} ({Math.abs(corr.correlation).toFixed(2)})
+                </div>
+              </div>
+            </motion.div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+// ===== ADAPTIVE DIFFICULTY SETTINGS =====
+function AdaptiveDifficultySettings({ settings, onUpdate }: {
+  settings: { enabled: boolean; adjustmentRate: number; minTarget: number; maxTarget: number };
+  onUpdate: (settings: Partial<{ enabled: boolean; adjustmentRate: number; minTarget: number; maxTarget: number }>) => void;
+}) {
+  return (
+    <div className="bg-gradient-to-br from-amber-50 to-orange-100 rounded-2xl p-4 shadow-sm border border-amber-200">
+      <div className="flex items-center gap-2 mb-3">
+        <span className="text-2xl">🎚️</span>
+        <h3 className="font-bold text-gray-800">Adaptive Difficulty</h3>
+      </div>
+      
+      <div className="space-y-3">
+        <div className="flex items-center justify-between">
+          <div className="text-sm text-gray-700">Auto-adjust targets</div>
+          <button
+            onClick={() => onUpdate({ enabled: !settings.enabled })}
+            className={`w-12 h-6 rounded-full transition-colors ${
+              settings.enabled ? 'bg-amber-500' : 'bg-gray-300'
+            }`}
+          >
+            <div className={`w-5 h-5 bg-white rounded-full shadow-md transform transition-transform ${
+              settings.enabled ? 'translate-x-6' : 'translate-x-0.5'
+            }`} />
+          </button>
+        </div>
+        
+        {settings.enabled && (
+          <motion.div
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: 'auto' }}
+            className="space-y-2"
+          >
+            <div>
+              <label className="text-xs text-gray-600 block mb-1">
+                Adjustment Rate: {Math.round(settings.adjustmentRate * 100)}%
+              </label>
+              <input
+                type="range"
+                min="0.05"
+                max="0.3"
+                step="0.05"
+                value={settings.adjustmentRate}
+                onChange={(e) => onUpdate({ adjustmentRate: parseFloat(e.target.value) })}
+                className="w-full"
+              />
+            </div>
+            
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <label className="text-xs text-gray-600 block mb-1">Min Target</label>
+                <input
+                  type="number"
+                  min="1"
+                  value={settings.minTarget}
+                  onChange={(e) => onUpdate({ minTarget: parseInt(e.target.value) })}
+                  className="w-full p-1 border border-amber-200 rounded text-sm"
+                />
+              </div>
+              <div>
+                <label className="text-xs text-gray-600 block mb-1">Max Target</label>
+                <input
+                  type="number"
+                  min="1"
+                  value={settings.maxTarget}
+                  onChange={(e) => onUpdate({ maxTarget: parseInt(e.target.value) })}
+                  className="w-full p-1 border border-amber-200 rounded text-sm"
+                />
+              </div>
+            </div>
+            
+            <div className="text-xs text-gray-500 italic">
+              Targets adjust based on 14-day completion rate. Increase if &gt;90%, decrease if &lt;50%.
+            </div>
+          </motion.div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 // ===== WATER BOTTLE =====
 function WaterBottle({ glasses, goal, onAdd, onRemove }: { glasses: number; goal: number; onAdd: () => void; onRemove: () => void }) {
   const fillPercent = Math.min((glasses / goal) * 100, 100);
@@ -1733,6 +2089,12 @@ export default function App() {
     timeCapsules, reflections, createTimeCapsule, openTimeCapsule, createReflection,
     // Additional gamification
     addXp,
+    // Phase 4 features
+    habitStacks, streakRecoveries, adaptiveSettings,
+    addHabitStack, deleteHabitStack,
+    triggerStreakRecovery, markStreakRecovered,
+    calculateCorrelations,
+    adaptHabitDifficulty, updateAdaptiveSettings,
   } = useHabits();
 
   const [view, setView] = useState<'week' | 'month' | 'analytics'>('week');
@@ -2119,6 +2481,43 @@ export default function App() {
         {/* Sound Selector */}
         <div className="mb-4">
           <SoundSelector selectedSound={selectedSound} onSelectSound={setSelectedSound} />
+        </div>
+
+        {/* Streak Recovery Mode */}
+        {streakRecoveries.filter(r => !r.recoveredAt).length > 0 && (
+          <div className="mb-4">
+            <StreakRecoveryMode
+              streakRecoveries={streakRecoveries}
+              habits={habits}
+              onMarkRecovered={markStreakRecovered}
+            />
+          </div>
+        )}
+
+        {/* Habit Stacking Builder */}
+        <div className="mb-4">
+          <HabitStackingBuilder
+            habitStacks={habitStacks}
+            habits={habits}
+            onAddStack={addHabitStack}
+            onDeleteStack={deleteHabitStack}
+          />
+        </div>
+
+        {/* Habit Correlations */}
+        <div className="mb-4">
+          <HabitCorrelations
+            correlations={calculateCorrelations()}
+            habits={habits}
+          />
+        </div>
+
+        {/* Adaptive Difficulty Settings */}
+        <div className="mb-4">
+          <AdaptiveDifficultySettings
+            settings={adaptiveSettings}
+            onUpdate={updateAdaptiveSettings}
+          />
         </div>
 
         {/* View toggle */}

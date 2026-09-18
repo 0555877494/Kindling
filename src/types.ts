@@ -300,5 +300,37 @@ export const SOUND_OPTIONS: Record<SoundType, { name: string; icon: string }> = 
   none: { name: 'Silent', icon: '🔇' },
 };
 
+// Habit stacking
+export interface HabitStack {
+  id: string;
+  name: string;
+  habits: string[]; // habit IDs in order
+  createdAt: string;
+}
+
+// Streak recovery
+export interface StreakRecovery {
+  habitId: string;
+  brokenAt: string;
+  recoveredAt?: string;
+  message: string;
+}
+
+// Habit correlations
+export interface HabitCorrelation {
+  habitId1: string;
+  habitId2: string;
+  correlation: number; // -1 to 1
+  strength: 'weak' | 'moderate' | 'strong';
+}
+
+// Adaptive difficulty
+export interface AdaptiveSettings {
+  enabled: boolean;
+  adjustmentRate: number; // 0.1 = 10% adjustment
+  minTarget: number;
+  maxTarget: number;
+}
+
 export const MOOD_EMOJIS = ['😢', '😕', '😐', '😊', '😄'];
 export const MOOD_LABELS = ['Terrible', 'Bad', 'Okay', 'Good', 'Amazing'];

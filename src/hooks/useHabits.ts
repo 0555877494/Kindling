@@ -3,6 +3,7 @@ import { useLocalStorage } from './useLocalStorage';
 import {
   Habit, HabitLog, WaterLog, MealLog, MoodLog, Reminder, HabitNote,
   Weekday, Theme, UserStats, Achievement, StreakShield, GardenPlant, TimeCapsule, Reflection,
+  HabitStack, StreakRecovery, HabitCorrelation, AdaptiveSettings,
   ACHIEVEMENTS, GARDEN_PLANTS,
 } from '../types';
 import { format, subDays, startOfWeek, addDays, differenceInCalendarDays } from 'date-fns';
@@ -109,6 +110,16 @@ export function useHabits() {
   const [reflections, setReflections] = useLocalStorage<Reflection[]>('kindling-reflections', []);
   const [selectedTheme, setSelectedTheme] = useLocalStorage<Theme>('kindling-theme', 'default');
   const [newAchievement, setNewAchievement] = useState<Achievement | null>(null);
+  
+  // Phase 4 features
+  const [habitStacks, setHabitStacks] = useLocalStorage<HabitStack[]>('kindling-stacks', []);
+  const [streakRecoveries, setStreakRecoveries] = useLocalStorage<StreakRecovery[]>('kindling-recoveries', []);
+  const [adaptiveSettings, setAdaptiveSettings] = useLocalStorage<AdaptiveSettings>('kindling-adaptive', {
+    enabled: false,
+    adjustmentRate: 0.1,
+    minTarget: 1,
+    maxTarget: 100,
+  });
 
   // XP and Level
   const calculateLevel = (xp: number): number => Math.floor(Math.sqrt(xp / 100)) + 1;
@@ -582,6 +593,189 @@ export function useHabits() {
     setReminders(prev => prev.filter(r => r.id !== id));
   }, [setReminders]);
 
+  // Habit Stacking
+  const addHabitStack = useCallback((name: string, habitIds: string[]) => {
+    const stack: HabitStack = {
+      id: uuidv4(),
+      name,
+      habits: habitIds,
+      createdAt: new Date().toISOString(),
+    };
+    setHabitStacks(prev => [...prev, stack]);
+    return stack;
+  }, [setHabitStacks]);
+
+  const deleteHabitStack = useCallback((id: string) => {
+    setHabitStacks(prev => prev.filter(s => s.id !== id));
+  }, [setHabitStacks]);
+
+  // Streak Recovery
+  const triggerStreakRecovery = useCallback((habitId: string) => {
+    const habit = habits.find(h => h.id === habitId);
+    if (!habit) return;
+    
+    const messages = [
+      "Every expert was once a beginner. Your journey continues!",
+      "One missed day doesn't define you. What matters is what you do next.",
+      "Progress, not perfection. You're still building something amazing.",
+      "The flame may dim, but it never goes out. Keep kindling!",
+      "Setbacks are setups for comebacks. You've got this!",
+    ];
+    
+    const recovery: StreakRecovery = {
+      habitId,
+      brokenAt: new Date().toISOString(),
+      message: messages[Math.floor(Math.random() * messages.length)],
+    };
+    
+    setStreakRecoveries(prev => [...prev, recovery]);
+    return recovery;
+  }, [habits, setStreakRecoveries]);
+
+  const markStreakRecovered = useCallback((habitId: string) => {
+    setStreakRecoveries(prev => prev.map(r => 
+      r.habitId === habitId && !r.recoveredAt 
+        ? { ...r, recoveredAt: new Date().toISOString() }
+        : r
+    ));
+  }, [setStreakRecoveries]);
+
+  // Habit Correlations
+  const calculateCorrelations = useCallback((): HabitCorrelation[] => {
+    const correlations: HabitCorrelation[] = [];
+    const activeHabits = habits.filter(h => !h.archived);
+    
+    if (activeHabits.length < 2) return correlations;
+    
+    // Calculate correlation for each pair of habits
+    for (let i = 0; i < activeHabits.length; i++) {
+      for (let j = i + 1; j < activeHabits.length; j++) {
+        const habit1 = activeHabits[i];
+        const habit2 = activeHabits[j];
+        
+        // Get last 30 days of data
+        const last30Days = Array.from({ length: 30 }, (_, idx) => {
+          const date = subDays(new Date(), idx);
+          return format(date, 'yyyy-MM-dd');
+        });
+        
+        let bothCompleted = 0;
+        let habit1Only = 0;
+        let habit2Only = 0;
+        let neitherCompleted = 0;
+        
+        last30Days.forEach(dateStr => {
+          const log1 = logs.find(l => l.habitId === habit1.id && l.date === dateStr);
+          const log2 = logs.find(l => l.habitId === habit2.id && l.date === dateStr);
+          
+          const completed1 = log1?.completed || false;
+          const completed2 = log2?.completed || false;
+          
+          if (completed1 && completed2) bothCompleted++;
+          else if (completed1) habit1Only++;
+          else if (completed2) habit2Only++;
+          else neitherCompleted++;
+        });
+        
+        // Calculate correlation coefficient
+        const total = last30Days.length;
+        const p1 = (bothCompleted + habit1Only) / total;
+        const p2 = (bothCompleted + habit2Only) / total;
+        const p12 = bothCompleted / total;
+        
+        const correlation = (p12 - p1 * p2) / Math.sqrt(p1 * (1 - p1) * p2 * (1 - p2));
+        
+        // Determine strength
+        const absCorr = Math.abs(correlation);
+        let strength: 'weak' | 'moderate' | 'strong' = 'weak';
+        if (absCorr > 0.7) strength = 'strong';
+        else if (absCorr > 0.4) strength = 'moderate';
+        
+        correlations.push({
+          habitId1: habit1.id,
+          habitId2: habit2.id,
+          correlation: Math.round(correlation * 100) / 100,
+          strength,
+        });
+      }
+    }
+    
+    return correlations.sort((a, b) => Math.abs(b.correlation) - Math.abs(a.correlation));
+  }, [habits, logs]);
+
+  // Adaptive Difficulty
+  const adaptHabitDifficulty = useCallback((habitId: string) => {
+    if (!adaptiveSettings.enabled) return;
+    
+    const habit = habits.find(h => h.id === habitId);
+    if (!habit) return;
+    
+    // Get last 14 days of data
+    const last14Days = Array.from({ length: 14 }, (_, i) => {
+      const date = subDays(new Date(), i);
+      return format(date, 'yyyy-MM-dd');
+    });
+    
+    let completedDays = 0;
+    let activeDays = 0;
+    
+    last14Days.forEach(dateStr => {
+      const date = new Date(dateStr);
+      if (isHabitActiveOnDateStatic(habit, date)) {
+        activeDays++;
+        const log = logs.find(l => l.habitId === habitId && l.date === dateStr);
+        if (log?.completed) completedDays++;
+      }
+    });
+    
+    if (activeDays === 0) return;
+    
+    const completionRate = completedDays / activeDays;
+    const adjustment = adaptiveSettings.adjustmentRate;
+    
+    let newTarget: number | undefined;
+    
+    if (habit.trackingMode === 'count' && habit.targetCount) {
+      if (completionRate > 0.9) {
+        // Increase difficulty
+        newTarget = Math.min(
+          Math.ceil(habit.targetCount * (1 + adjustment)),
+          adaptiveSettings.maxTarget
+        );
+      } else if (completionRate < 0.5) {
+        // Decrease difficulty
+        newTarget = Math.max(
+          Math.floor(habit.targetCount * (1 - adjustment)),
+          adaptiveSettings.minTarget
+        );
+      }
+      
+      if (newTarget && newTarget !== habit.targetCount) {
+        updateHabit(habitId, { targetCount: newTarget });
+      }
+    } else if (habit.trackingMode === 'timer' && habit.targetDuration) {
+      if (completionRate > 0.9) {
+        newTarget = Math.min(
+          Math.ceil(habit.targetDuration * (1 + adjustment)),
+          adaptiveSettings.maxTarget
+        );
+      } else if (completionRate < 0.5) {
+        newTarget = Math.max(
+          Math.floor(habit.targetDuration * (1 - adjustment)),
+          adaptiveSettings.minTarget
+        );
+      }
+      
+      if (newTarget && newTarget !== habit.targetDuration) {
+        updateHabit(habitId, { targetDuration: newTarget });
+      }
+    }
+  }, [habits, logs, adaptiveSettings, updateHabit]);
+
+  const updateAdaptiveSettings = useCallback((settings: Partial<AdaptiveSettings>) => {
+    setAdaptiveSettings(prev => ({ ...prev, ...settings }));
+  }, [setAdaptiveSettings]);
+
   // Today's progress
   const todayStr = format(new Date(), 'yyyy-MM-dd');
   const activeHabits = habits.filter(h => !h.archived);
@@ -616,5 +810,11 @@ export function useHabits() {
     addXp, checkAchievements, earnStreakShield,
     updateGardenPlant, createTimeCapsule, openTimeCapsule,
     createReflection, setSelectedTheme,
+    // Phase 4 features
+    habitStacks, streakRecoveries, adaptiveSettings,
+    addHabitStack, deleteHabitStack,
+    triggerStreakRecovery, markStreakRecovered,
+    calculateCorrelations,
+    adaptHabitDifficulty, updateAdaptiveSettings,
   };
 }
