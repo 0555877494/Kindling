@@ -9,9 +9,10 @@ import {
 } from 'lucide-react';
 import { useHabits } from './hooks/useHabits';
 import {
-  Habit, TimeOfDay, Weekday, HabitType, TrackingMode, ScheduleType,
+  Habit, TimeOfDay, Weekday, HabitType, TrackingMode, ScheduleType, Theme,
   HABIT_COLORS, HABIT_ICONS, HABIT_CATEGORIES, HABIT_TEMPLATES,
   TIME_OF_DAY_LABELS, WEEKDAY_NAMES, MOOD_EMOJIS, MOOD_LABELS,
+  GARDEN_PLANTS, THEMES, ACHIEVEMENTS,
 } from './types';
 import confetti from 'canvas-confetti';
 
@@ -112,6 +113,211 @@ function FlameIcon() {
         <Flame className="w-6 h-6 text-amber-400 blur-[1px]" />
       </motion.div>
     </motion.div>
+  );
+}
+
+// ===== XP & LEVEL DISPLAY =====
+function XpDisplay({ xp, level, consistencyScore }: { xp: number; level: number; consistencyScore: number }) {
+  const xpForNextLevel = Math.pow(level, 2) * 100;
+  const xpForCurrentLevel = Math.pow(level - 1, 2) * 100;
+  const progress = ((xp - xpForCurrentLevel) / (xpForNextLevel - xpForCurrentLevel)) * 100;
+
+  return (
+    <TiltCard className="bg-gradient-to-br from-purple-500/90 to-indigo-600/90 backdrop-blur-md rounded-3xl p-5 shadow-lg border border-white/20 text-white">
+      <div className="flex items-center justify-between mb-3">
+        <div className="flex items-center gap-3">
+          <div className="text-4xl">⚡</div>
+          <div>
+            <div className="text-xs opacity-80">Level {level}</div>
+            <div className="text-2xl font-bold">{xp.toLocaleString()} XP</div>
+          </div>
+        </div>
+        <div className="text-right">
+          <div className="text-xs opacity-80">Consistency</div>
+          <div className="text-2xl font-bold">{consistencyScore}%</div>
+        </div>
+      </div>
+      <div className="h-2 bg-white/20 rounded-full overflow-hidden">
+        <motion.div className="h-full bg-gradient-to-r from-yellow-300 to-orange-400 rounded-full"
+          initial={{ width: 0 }} animate={{ width: `${progress}%` }}
+          transition={{ type: 'spring', stiffness: 100, damping: 20 }} />
+      </div>
+      <div className="text-xs opacity-70 mt-1 text-right">
+        {xpForNextLevel - xp} XP to Level {level + 1}
+      </div>
+    </TiltCard>
+  );
+}
+
+// ===== ACHIEVEMENT NOTIFICATION =====
+function AchievementNotification({ achievement, onClose }: { achievement: any; onClose: () => void }) {
+  useEffect(() => {
+    const timer = setTimeout(onClose, 5000);
+    return () => clearTimeout(timer);
+  }, [onClose]);
+
+  const rarityColors: Record<string, string> = {
+    common: 'from-gray-400 to-gray-500',
+    rare: 'from-blue-400 to-blue-600',
+    epic: 'from-purple-400 to-purple-600',
+    legendary: 'from-yellow-400 to-orange-500',
+  };
+
+  return (
+    <motion.div
+      className="fixed top-20 left-1/2 -translate-x-1/2 z-50 bg-white rounded-2xl shadow-2xl p-4 flex items-center gap-4 border-2"
+      style={{ borderColor: achievement.rarity === 'legendary' ? '#f59e0b' : achievement.rarity === 'epic' ? '#8b5cf6' : '#3b82f6' }}
+      initial={{ y: -100, opacity: 0, scale: 0.8 }}
+      animate={{ y: 0, opacity: 1, scale: 1 }}
+      exit={{ y: -100, opacity: 0, scale: 0.8 }}
+      transition={{ type: 'spring', stiffness: 300, damping: 25 }}
+    >
+      <motion.div
+        className={`w-16 h-16 rounded-xl bg-gradient-to-br ${rarityColors[achievement.rarity]} flex items-center justify-center text-3xl shadow-lg`}
+        animate={{ rotate: [0, -10, 10, -10, 0], scale: [1, 1.1, 1] }}
+        transition={{ duration: 0.6, delay: 0.2 }}
+      >
+        {achievement.icon}
+      </motion.div>
+      <div>
+        <div className="text-xs text-gray-500 uppercase tracking-wide">Achievement Unlocked!</div>
+        <div className="text-lg font-bold text-gray-800">{achievement.name}</div>
+        <div className="text-sm text-gray-600">{achievement.description}</div>
+      </div>
+      <button onClick={onClose} className="p-1 rounded-lg hover:bg-gray-100 ml-2">
+        <X className="w-4 h-4 text-gray-400" />
+      </button>
+    </motion.div>
+  );
+}
+
+// ===== HABIT GARDEN =====
+function HabitGarden({ plants, habits }: { plants: any[]; habits: Habit[] }) {
+  if (plants.length === 0) {
+    return (
+      <TiltCard className="bg-gradient-to-br from-green-50 to-emerald-100 rounded-3xl p-5 shadow-lg border border-green-200/50">
+        <div className="text-center py-8">
+          <div className="text-5xl mb-3">🌱</div>
+          <div className="text-gray-600 font-medium">Your garden is empty</div>
+          <div className="text-sm text-gray-500 mt-1">Complete habits to grow plants!</div>
+        </div>
+      </TiltCard>
+    );
+  }
+
+  return (
+    <TiltCard className="bg-gradient-to-br from-green-50 to-emerald-100 rounded-3xl p-5 shadow-lg border border-green-200/50">
+      <div className="flex items-center gap-2 mb-4">
+        <span className="text-2xl">🌻</span>
+        <h3 className="font-bold text-gray-800">Your Habit Garden</h3>
+      </div>
+      <div className="grid grid-cols-4 gap-3">
+        {plants.map(plant => {
+          const habit = habits.find(h => h.id === plant.habitId);
+          const plantDef = GARDEN_PLANTS.find(p => p.type === plant.plantType);
+          const stage = plantDef?.stages[plant.growthStage] || '🌱';
+          const healthColor = plant.health > 70 ? 'text-green-600' : plant.health > 40 ? 'text-yellow-600' : 'text-red-600';
+          
+          return (
+            <motion.div
+              key={plant.habitId}
+              className="flex flex-col items-center p-2 bg-white/60 rounded-xl"
+              whileHover={{ scale: 1.05 }}
+              title={habit?.name || 'Unknown habit'}
+            >
+              <motion.div
+                className="text-3xl mb-1"
+                animate={{ y: [0, -3, 0] }}
+                transition={{ duration: 2, repeat: Infinity, delay: Math.random() * 2 }}
+              >
+                {stage}
+              </motion.div>
+              <div className={`text-xs font-medium ${healthColor}`}>
+                {plant.health}%
+              </div>
+            </motion.div>
+          );
+        })}
+      </div>
+    </TiltCard>
+  );
+}
+
+// ===== STREAK SHIELDS =====
+function StreakShieldsDisplay({ shields, count }: { shields: any[]; count: number }) {
+  return (
+    <div className="flex items-center gap-2">
+      <div className="text-2xl">🛡️</div>
+      <div>
+        <div className="text-xs text-gray-500">Streak Shields</div>
+        <div className="text-lg font-bold text-gray-800">{count}</div>
+      </div>
+      {count > 0 && (
+        <div className="flex gap-1 ml-2">
+          {shields.slice(-3).map(shield => (
+            <motion.div
+              key={shield.id}
+              className="w-6 h-6 bg-gradient-to-br from-blue-400 to-indigo-500 rounded-full flex items-center justify-center text-xs text-white shadow-md"
+              animate={{ rotate: [0, 360] }}
+              transition={{ duration: 20, repeat: Infinity, ease: 'linear' }}
+            >
+              ✨
+            </motion.div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ===== THEME SWITCHER =====
+function ThemeSwitcher({ selectedTheme, onSelectTheme, level }: { selectedTheme: Theme; onSelectTheme: (theme: Theme) => void; level: number }) {
+  const [isOpen, setIsOpen] = useState(false);
+
+  return (
+    <div className="relative">
+      <button
+        onClick={() => setIsOpen(!isOpen)}
+        className="w-9 h-9 rounded-full bg-white/60 backdrop-blur-sm flex items-center justify-center text-gray-500 hover:text-gray-700 hover:bg-white/80 transition-all"
+      >
+        🎨
+      </button>
+      <AnimatePresence>
+        {isOpen && (
+          <motion.div
+            className="absolute right-0 mt-2 bg-white rounded-2xl shadow-xl border border-gray-200 p-2 z-50 min-w-[200px]"
+            initial={{ opacity: 0, y: -10, scale: 0.95 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -10, scale: 0.95 }}
+          >
+            {Object.entries(THEMES).map(([key, theme]) => {
+              const unlocked = level >= theme.unlockLevel;
+              return (
+                <button
+                  key={key}
+                  onClick={() => {
+                    if (unlocked) {
+                      onSelectTheme(key as Theme);
+                      setIsOpen(false);
+                    }
+                  }}
+                  disabled={!unlocked}
+                  className={`w-full flex items-center gap-3 px-3 py-2 rounded-xl text-sm transition-all ${
+                    selectedTheme === key ? 'bg-orange-100 text-orange-700' :
+                    unlocked ? 'hover:bg-gray-100 text-gray-700' : 'opacity-50 cursor-not-allowed text-gray-400'
+                  }`}
+                >
+                  <div className={`w-6 h-6 rounded-full bg-gradient-to-br ${theme.bg}`} />
+                  <span className="flex-1 text-left">{theme.name}</span>
+                  {!unlocked && <span className="text-xs">🔒 Lvl {theme.unlockLevel}</span>}
+                  {selectedTheme === key && <Check className="w-4 h-4" />}
+                </button>
+              );
+            })}
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
   );
 }
 
@@ -906,6 +1112,9 @@ export default function App() {
     addNote, getNotesForHabitDate, deleteNote,
     getWaterForDate, addWater, removeWater, getMealsForDate, toggleMeal,
     getMoodForDate, setMood, reminders, addReminder, toggleReminder, deleteReminder,
+    // Gamification
+    userStats, streakShields, gardenPlants, selectedTheme, consistencyScore, newAchievement,
+    setSelectedTheme,
   } = useHabits();
 
   const [view, setView] = useState<'week' | 'month' | 'analytics'>('week');
@@ -1074,6 +1283,11 @@ export default function App() {
         {reminderToast && <ReminderToast message={reminderToast} onDismiss={() => setReminderToast(null)} />}
       </AnimatePresence>
       <AnimatePresence>
+        {newAchievement && (
+          <AchievementNotification achievement={newAchievement} onClose={() => {}} />
+        )}
+      </AnimatePresence>
+      <AnimatePresence>
         {deletedHabit && (
           <motion.div className="fixed bottom-4 left-1/2 -translate-x-1/2 bg-gray-900 text-white rounded-2xl px-5 py-3 shadow-2xl flex items-center gap-3 z-50"
             initial={{ y: 100, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 100, opacity: 0 }}>
@@ -1105,6 +1319,7 @@ export default function App() {
               <h1 className={`text-2xl font-bold ${darkMode ? 'text-gray-100' : 'text-gray-800'}`}>Kindling</h1>
             </div>
             <div className="flex items-center gap-2">
+              <ThemeSwitcher selectedTheme={selectedTheme} onSelectTheme={setSelectedTheme} level={userStats.level} />
               <button onClick={() => setShowShortcuts(true)} className={`w-9 h-9 rounded-full ${darkMode ? 'bg-gray-800/60 text-gray-300' : 'bg-white/60 text-gray-500'} backdrop-blur-sm flex items-center justify-center transition-all`} title="Shortcuts (?)">
                 <Command className="w-4 h-4" />
               </button>
@@ -1197,6 +1412,23 @@ export default function App() {
             )}
           </motion.div>
         </TiltCard>
+
+        {/* XP & Level Display */}
+        <div className="mb-4">
+          <XpDisplay xp={userStats.totalXp} level={userStats.level} consistencyScore={consistencyScore} />
+        </div>
+
+        {/* Habit Garden */}
+        <div className="mb-4">
+          <HabitGarden plants={gardenPlants} habits={habits} />
+        </div>
+
+        {/* Streak Shields */}
+        {userStats.streakShields > 0 && (
+          <div className="mb-4 bg-white/70 backdrop-blur-md rounded-3xl p-4 shadow-lg border border-white/50">
+            <StreakShieldsDisplay shields={streakShields} count={userStats.streakShields} />
+          </div>
+        )}
 
         {/* View toggle */}
         <div className="flex gap-2 mb-4">
