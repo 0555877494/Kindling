@@ -90,3 +90,41 @@ input[type="range"]::-webkit-slider-thumb:hover {
   background-color: rgba(251, 146, 60, 0.2);
   color: inherit;
 }
+
+/* Print styles */
+@media print {
+  body { background: white !important; }
+  .no-print { display: none !important; }
+  * { color: black !important; background: white !important; box-shadow: none !important; }
+}
+
+/* Reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* High contrast mode */
+@media (prefers-contrast: high) {
+  button, a { outline: 2px solid currentColor; }
+}
+
+/* Focus visible for keyboard navigation */
+:focus-visible {
+  outline: 2px solid #f97316;
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* Mobile improvements */
+@media (max-width: 640px) {
+  html { font-size: 15px; }
+}
+
+/* Safe area for notched devices */
+@supports (padding: env(safe-area-inset-bottom)) {
+  body { padding-bottom: env(safe-area-inset-bottom); }
+}
