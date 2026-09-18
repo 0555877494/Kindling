@@ -321,6 +321,355 @@ function ThemeSwitcher({ selectedTheme, onSelectTheme, level }: { selectedTheme:
   );
 }
 
+// ===== HABIT SCIENCE TIP =====
+function HabitScienceTip() {
+  const tips = [
+    "🧠 Habits take 66 days to form on average, not 21!",
+    "⚡ Small wins create momentum - start with 2-minute habits",
+    "🎯 Stack new habits onto existing ones for better success",
+    "🌅 Morning routines set the tone for your entire day",
+    "📊 Tracking increases success rate by 40%",
+    "🔄 Missing one day won't break your streak - missing two might",
+    "🎨 Environment design beats willpower every time",
+    "💪 Identity-based habits stick: 'I am a runner' vs 'I want to run'",
+    "🌟 Celebrate small wins - your brain needs positive reinforcement",
+    "🧘 Consistency beats intensity - show up daily, even if briefly",
+  ];
+  
+  const today = new Date();
+  const dayIndex = (today.getFullYear() * 366 + today.getMonth() * 31 + today.getDate()) % tips.length;
+  const tip = tips[dayIndex];
+  
+  return (
+    <motion.div
+      className="bg-gradient-to-br from-blue-50 to-indigo-100 rounded-2xl p-4 shadow-sm border border-blue-200"
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ delay: 0.2 }}
+    >
+      <div className="flex items-start gap-3">
+        <div className="text-2xl">💡</div>
+        <div className="flex-1">
+          <div className="text-xs font-semibold text-blue-600 mb-1">Daily Habit Science</div>
+          <div className="text-sm text-gray-700">{tip}</div>
+        </div>
+      </div>
+    </motion.div>
+  );
+}
+
+// ===== KINDLING MOMENT =====
+function KindlingMoment() {
+  const moments = [
+    "Every small step is a spark that fuels your fire 🔥",
+    "You're building the person you want to become",
+    "Consistency beats intensity every time",
+    "The best time to start was yesterday. The second best time is now",
+    "You don't have to be extreme, just consistent",
+    "Small daily improvements lead to stunning results",
+    "You're not just building habits, you're building a life",
+    "Progress, not perfection",
+    "Every completion is a vote for your future self",
+    "The flame you're kindling today will light your tomorrow",
+  ];
+  
+  const hour = new Date().getHours();
+  const momentIndex = hour % moments.length;
+  const moment = moments[momentIndex];
+  
+  return (
+    <motion.div
+      className="bg-gradient-to-br from-orange-50 to-amber-100 rounded-2xl p-4 shadow-sm border border-orange-200"
+      initial={{ opacity: 0, scale: 0.95 }}
+      animate={{ opacity: 1, scale: 1 }}
+      transition={{ delay: 0.3 }}
+    >
+      <div className="text-center">
+        <div className="text-xs font-semibold text-orange-600 mb-2">✨ Kindling Moment</div>
+        <div className="text-sm text-gray-700 italic">{moment}</div>
+      </div>
+    </motion.div>
+  );
+}
+
+// ===== TIME CAPSULE =====
+function TimeCapsule({ capsules, onCreate, onOpen }: {
+  capsules: Array<{ id: string; message: string; createdAt: string; openAt: string; opened: boolean }>;
+  onCreate: (message: string, daysToOpen: number) => void;
+  onOpen: (id: string) => void;
+}) {
+  const [showForm, setShowForm] = useState(false);
+  const [message, setMessage] = useState('');
+  const [days, setDays] = useState(30);
+  
+  const canOpen = (openAt: string) => new Date(openAt) <= new Date();
+  
+  return (
+    <div className="bg-gradient-to-br from-purple-50 to-pink-100 rounded-2xl p-4 shadow-sm border border-purple-200">
+      <div className="flex items-center justify-between mb-3">
+        <div className="flex items-center gap-2">
+          <span className="text-2xl">💊</span>
+          <h3 className="font-bold text-gray-800">Time Capsules</h3>
+        </div>
+        <button
+          onClick={() => setShowForm(!showForm)}
+          className="text-sm text-purple-600 hover:text-purple-700 font-medium"
+        >
+          {showForm ? 'Cancel' : '+ New'}
+        </button>
+      </div>
+      
+      {showForm && (
+        <motion.div
+          initial={{ opacity: 0, height: 0 }}
+          animate={{ opacity: 1, height: 'auto' }}
+          exit={{ opacity: 0, height: 0 }}
+          className="mb-3"
+        >
+          <textarea
+            value={message}
+            onChange={(e) => setMessage(e.target.value)}
+            placeholder="Write a message to your future self..."
+            className="w-full p-2 border border-purple-200 rounded-lg text-sm resize-none"
+            rows={3}
+          />
+          <div className="flex items-center gap-2 mt-2">
+            <label className="text-xs text-gray-600">Open in:</label>
+            <select
+              value={days}
+              onChange={(e) => setDays(Number(e.target.value))}
+              className="text-sm border border-purple-200 rounded px-2 py-1"
+            >
+              <option value={7}>7 days</option>
+              <option value={30}>30 days</option>
+              <option value={90}>90 days</option>
+              <option value={365}>1 year</option>
+            </select>
+            <button
+              onClick={() => {
+                if (message.trim()) {
+                  onCreate(message, days);
+                  setMessage('');
+                  setShowForm(false);
+                }
+              }}
+              className="ml-auto px-3 py-1 bg-purple-600 text-white text-sm rounded-lg hover:bg-purple-700"
+            >
+              Create
+            </button>
+          </div>
+        </motion.div>
+      )}
+      
+      <div className="space-y-2 max-h-40 overflow-y-auto">
+        {capsules.length === 0 && !showForm && (
+          <div className="text-center text-sm text-gray-500 py-4">
+            No capsules yet. Write to your future self!
+          </div>
+        )}
+        {capsules.map((capsule) => (
+          <motion.div
+            key={capsule.id}
+            className="bg-white/60 rounded-lg p-3 text-sm"
+            whileHover={{ scale: 1.02 }}
+          >
+            <div className="flex items-start justify-between gap-2">
+              <div className="flex-1">
+                <div className="text-xs text-gray-500 mb-1">
+                  Created {format(new Date(capsule.createdAt), 'MMM d, yyyy')}
+                </div>
+                {capsule.opened ? (
+                  <div className="text-gray-700">{capsule.message}</div>
+                ) : (
+                  <div className="text-gray-500 italic">
+                    Opens {format(new Date(capsule.openAt), 'MMM d, yyyy')}
+                  </div>
+                )}
+              </div>
+              {!capsule.opened && canOpen(capsule.openAt) && (
+                <button
+                  onClick={() => onOpen(capsule.id)}
+                  className="px-2 py-1 bg-purple-600 text-white text-xs rounded hover:bg-purple-700 whitespace-nowrap"
+                >
+                  Open
+                </button>
+              )}
+            </div>
+          </motion.div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ===== REFLECTION =====
+function Reflection({ reflections, onCreate }: {
+  reflections: Array<{ id: string; date: string; type: 'weekly' | 'monthly'; content: string; mood?: number; createdAt: string }>;
+  onCreate: (type: 'weekly' | 'monthly', content: string, mood?: number) => void;
+}) {
+  const [showForm, setShowForm] = useState(false);
+  const [type, setType] = useState<'weekly' | 'monthly'>('weekly');
+  const [content, setContent] = useState('');
+  const [mood, setMood] = useState<number | undefined>();
+  
+  return (
+    <div className="bg-gradient-to-br from-green-50 to-emerald-100 rounded-2xl p-4 shadow-sm border border-green-200">
+      <div className="flex items-center justify-between mb-3">
+        <div className="flex items-center gap-2">
+          <span className="text-2xl">📝</span>
+          <h3 className="font-bold text-gray-800">Reflections</h3>
+        </div>
+        <button
+          onClick={() => setShowForm(!showForm)}
+          className="text-sm text-green-600 hover:text-green-700 font-medium"
+        >
+          {showForm ? 'Cancel' : '+ Reflect'}
+        </button>
+      </div>
+      
+      {showForm && (
+        <motion.div
+          initial={{ opacity: 0, height: 0 }}
+          animate={{ opacity: 1, height: 'auto' }}
+          className="mb-3"
+        >
+          <div className="flex gap-2 mb-2">
+            <button
+              onClick={() => setType('weekly')}
+              className={`flex-1 py-1 text-sm rounded ${type === 'weekly' ? 'bg-green-600 text-white' : 'bg-white text-gray-600'}`}
+            >
+              Weekly
+            </button>
+            <button
+              onClick={() => setType('monthly')}
+              className={`flex-1 py-1 text-sm rounded ${type === 'monthly' ? 'bg-green-600 text-white' : 'bg-white text-gray-600'}`}
+            >
+              Monthly
+            </button>
+          </div>
+          
+          <div className="flex gap-1 mb-2">
+            {[1, 2, 3, 4, 5].map((m) => (
+              <button
+                key={m}
+                onClick={() => setMood(mood === m ? undefined : m)}
+                className={`flex-1 text-2xl rounded p-1 ${mood === m ? 'bg-green-200' : 'hover:bg-green-100'}`}
+              >
+                {['😢', '😕', '😐', '😊', '😄'][m - 1]}
+              </button>
+            ))}
+          </div>
+          
+          <textarea
+            value={content}
+            onChange={(e) => setContent(e.target.value)}
+            placeholder="How did your week/month go? What worked? What didn't?"
+            className="w-full p-2 border border-green-200 rounded-lg text-sm resize-none"
+            rows={3}
+          />
+          
+          <button
+            onClick={() => {
+              if (content.trim()) {
+                onCreate(type, content, mood);
+                setContent('');
+                setMood(undefined);
+                setShowForm(false);
+              }
+            }}
+            className="w-full mt-2 px-3 py-2 bg-green-600 text-white text-sm rounded-lg hover:bg-green-700"
+          >
+            Save Reflection
+          </button>
+        </motion.div>
+      )}
+      
+      <div className="space-y-2 max-h-40 overflow-y-auto">
+        {reflections.length === 0 && !showForm && (
+          <div className="text-center text-sm text-gray-500 py-4">
+            No reflections yet. Take a moment to reflect!
+          </div>
+        )}
+        {reflections.slice(-5).reverse().map((reflection) => (
+          <motion.div
+            key={reflection.id}
+            className="bg-white/60 rounded-lg p-3 text-sm"
+            whileHover={{ scale: 1.02 }}
+          >
+            <div className="flex items-start justify-between gap-2 mb-1">
+              <div className="text-xs text-gray-500">
+                {format(new Date(reflection.createdAt), 'MMM d, yyyy')} • {reflection.type}
+              </div>
+              {reflection.mood && (
+                <div className="text-lg">
+                  {['😢', '😕', '😐', '😊', '😄'][reflection.mood - 1]}
+                </div>
+              )}
+            </div>
+            <div className="text-gray-700">{reflection.content}</div>
+          </motion.div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ===== HABIT HEATMAP =====
+function HabitHeatmap({ logs, habits }: { logs: Array<{ date: string; completed: boolean }>; habits: Habit[] }) {
+  const today = new Date();
+  const days = 365;
+  const heatmapData = Array.from({ length: days }, (_, i) => {
+    const date = subDays(today, days - 1 - i);
+    const dateStr = format(date, 'yyyy-MM-dd');
+    const dayLogs = logs.filter(l => l.date === dateStr && l.completed);
+    const totalHabits = habits.filter(h => !h.archived).length;
+    const completionRate = totalHabits > 0 ? dayLogs.length / totalHabits : 0;
+    return { date, completionRate, count: dayLogs.length };
+  });
+  
+  const getColor = (rate: number) => {
+    if (rate === 0) return 'bg-gray-100';
+    if (rate < 0.25) return 'bg-green-200';
+    if (rate < 0.5) return 'bg-green-300';
+    if (rate < 0.75) return 'bg-green-400';
+    return 'bg-green-600';
+  };
+  
+  return (
+    <div className="bg-white/70 backdrop-blur-md rounded-3xl p-5 shadow-lg border border-white/50">
+      <div className="flex items-center gap-2 mb-4">
+        <span className="text-2xl">📊</span>
+        <h3 className="font-bold text-gray-800">Year in Review</h3>
+      </div>
+      
+      <div className="overflow-x-auto">
+        <div className="flex gap-1 min-w-[600px]">
+          {heatmapData.map((day, i) => (
+            <motion.div
+              key={i}
+              className={`w-3 h-3 rounded-sm ${getColor(day.completionRate)}`}
+              whileHover={{ scale: 1.5 }}
+              title={`${format(day.date, 'MMM d, yyyy')}: ${day.count} habits completed`}
+            />
+          ))}
+        </div>
+      </div>
+      
+      <div className="flex items-center justify-end gap-2 mt-3 text-xs text-gray-500">
+        <span>Less</span>
+        <div className="flex gap-1">
+          <div className="w-3 h-3 rounded-sm bg-gray-100" />
+          <div className="w-3 h-3 rounded-sm bg-green-200" />
+          <div className="w-3 h-3 rounded-sm bg-green-300" />
+          <div className="w-3 h-3 rounded-sm bg-green-400" />
+          <div className="w-3 h-3 rounded-sm bg-green-600" />
+        </div>
+        <span>More</span>
+      </div>
+    </div>
+  );
+}
+
 // ===== WATER BOTTLE =====
 function WaterBottle({ glasses, goal, onAdd, onRemove }: { glasses: number; goal: number; onAdd: () => void; onRemove: () => void }) {
   const fillPercent = Math.min((glasses / goal) * 100, 100);
@@ -1115,6 +1464,8 @@ export default function App() {
     // Gamification
     userStats, streakShields, gardenPlants, selectedTheme, consistencyScore, newAchievement,
     setSelectedTheme,
+    // Time Capsules & Reflections
+    timeCapsules, reflections, createTimeCapsule, openTimeCapsule, createReflection,
   } = useHabits();
 
   const [view, setView] = useState<'week' | 'month' | 'analytics'>('week');
@@ -1429,6 +1780,34 @@ export default function App() {
             <StreakShieldsDisplay shields={streakShields} count={userStats.streakShields} />
           </div>
         )}
+
+        {/* Habit Science Tip */}
+        <div className="mb-4">
+          <HabitScienceTip />
+        </div>
+
+        {/* Kindling Moment */}
+        <div className="mb-4">
+          <KindlingMoment />
+        </div>
+
+        {/* Time Capsules & Reflections */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+          <TimeCapsule
+            capsules={timeCapsules}
+            onCreate={createTimeCapsule}
+            onOpen={openTimeCapsule}
+          />
+          <Reflection
+            reflections={reflections}
+            onCreate={createReflection}
+          />
+        </div>
+
+        {/* Habit Heatmap */}
+        <div className="mb-4">
+          <HabitHeatmap logs={logs} habits={habits} />
+        </div>
 
         {/* View toggle */}
         <div className="flex gap-2 mb-4">

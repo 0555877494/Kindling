@@ -268,7 +268,25 @@ export const KINDLING_MOMENTS = [
   "Progress, not perfection",
   "Every completion is a vote for your future self",
   "The flame you're kindling today will light your tomorrow",
+  "One day at a time, one habit at a time",
+  "Your future self will thank you for today's efforts",
+  "The compound effect of small habits is extraordinary",
+  "You're stronger than your excuses",
+  "Discipline is choosing between what you want now and what you want most",
 ];
+
+// Challenge templates
+export const CHALLENGE_TEMPLATES = [
+  { name: '7-Day Mindfulness', icon: '🧘', days: 7, description: 'Meditate every day for a week', category: 'Mind' },
+  { name: '21-Day Fitness', icon: '💪', days: 21, description: 'Build an exercise habit', category: 'Fitness' },
+  { name: '30-Day Reading', icon: '📚', days: 30, description: 'Read every day for a month', category: 'Learning' },
+  { name: 'Hydration Hero', icon: '💧', days: 14, description: 'Drink 8 glasses daily', category: 'Health' },
+  { name: 'Early Bird', icon: '🌅', days: 21, description: 'Wake up before 7 AM', category: 'Health' },
+  { name: 'Gratitude Journal', icon: '✍️', days: 30, description: 'Write 3 things you\'re grateful for', category: 'Mind' },
+];
+
+// Habit DNA types
+export type HabitDNA = 'Morning Champion' | 'Night Owl' | 'Consistent Warrior' | 'Weekend Hero' | 'Balanced Achiever';
 
 export const MOOD_EMOJIS = ['😢', '😕', '😐', '😊', '😄'];
 export const MOOD_LABELS = ['Terrible', 'Bad', 'Okay', 'Good', 'Amazing'];
