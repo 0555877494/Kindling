@@ -288,5 +288,17 @@ export const CHALLENGE_TEMPLATES = [
 // Habit DNA types
 export type HabitDNA = 'Morning Champion' | 'Night Owl' | 'Consistent Warrior' | 'Weekend Hero' | 'Balanced Achiever';
 
+// Sound options
+export type SoundType = 'default' | 'chime' | 'bell' | 'pop' | 'success' | 'none';
+
+export const SOUND_OPTIONS: Record<SoundType, { name: string; icon: string }> = {
+  default: { name: 'Default', icon: '🔔' },
+  chime: { name: 'Chime', icon: '🎵' },
+  bell: { name: 'Bell', icon: '🔔' },
+  pop: { name: 'Pop', icon: '💥' },
+  success: { name: 'Success', icon: '✨' },
+  none: { name: 'Silent', icon: '🔇' },
+};
+
 export const MOOD_EMOJIS = ['😢', '😕', '😐', '😊', '😄'];
 export const MOOD_LABELS = ['Terrible', 'Bad', 'Okay', 'Good', 'Amazing'];

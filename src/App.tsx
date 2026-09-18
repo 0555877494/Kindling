@@ -670,6 +670,271 @@ function HabitHeatmap({ logs, habits }: { logs: Array<{ date: string; completed:
   );
 }
 
+// ===== HABIT CHALLENGES =====
+function HabitChallenges({ challenges, onJoin, onComplete }: {
+  challenges: Array<{ id: string; name: string; icon: string; days: number; description: string; category: string; joined: boolean; progress: number; startDate?: string }>;
+  onJoin: (challengeId: string) => void;
+  onComplete: (challengeId: string) => void;
+}) {
+  return (
+    <div className="bg-gradient-to-br from-yellow-50 to-orange-100 rounded-2xl p-4 shadow-sm border border-yellow-200">
+      <div className="flex items-center gap-2 mb-3">
+        <span className="text-2xl">🏆</span>
+        <h3 className="font-bold text-gray-800">Habit Challenges</h3>
+      </div>
+      
+      <div className="space-y-2 max-h-60 overflow-y-auto">
+        {challenges.map((challenge) => (
+          <motion.div
+            key={challenge.id}
+            className="bg-white/60 rounded-lg p-3"
+            whileHover={{ scale: 1.02 }}
+          >
+            <div className="flex items-start gap-3">
+              <div className="text-3xl">{challenge.icon}</div>
+              <div className="flex-1">
+                <div className="font-semibold text-gray-800 text-sm">{challenge.name}</div>
+                <div className="text-xs text-gray-600 mb-2">{challenge.description}</div>
+                
+                {challenge.joined ? (
+                  <div>
+                    <div className="flex items-center justify-between text-xs text-gray-600 mb-1">
+                      <span>Progress</span>
+                      <span>{challenge.progress}/{challenge.days} days</span>
+                    </div>
+                    <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
+                      <motion.div
+                        className="h-full bg-gradient-to-r from-yellow-400 to-orange-500"
+                        initial={{ width: 0 }}
+                        animate={{ width: `${(challenge.progress / challenge.days) * 100}%` }}
+                        transition={{ type: 'spring', stiffness: 100 }}
+                      />
+                    </div>
+                    {challenge.progress >= challenge.days && (
+                      <button
+                        onClick={() => onComplete(challenge.id)}
+                        className="mt-2 w-full py-1 bg-green-500 text-white text-xs rounded hover:bg-green-600"
+                      >
+                        Complete Challenge ✓
+                      </button>
+                    )}
+                  </div>
+                ) : (
+                  <button
+                    onClick={() => onJoin(challenge.id)}
+                    className="mt-1 px-3 py-1 bg-yellow-500 text-white text-xs rounded hover:bg-yellow-600"
+                  >
+                    Join Challenge
+                  </button>
+                )}
+              </div>
+            </div>
+          </motion.div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ===== HABIT DNA ANALYSIS =====
+function HabitDNA({ logs, habits }: { logs: Array<{ date: string; completed: boolean; habitId: string }>; habits: Habit[] }) {
+  const analyzeDNA = (): { type: string; icon: string; description: string; color: string } => {
+    if (logs.length === 0) {
+      return { type: 'Just Getting Started', icon: '🌱', description: 'Begin your journey and discover your habit patterns!', color: 'from-gray-400 to-gray-500' };
+    }
+    
+    // Analyze completion patterns
+    const morningCompletions = logs.filter(l => {
+      const habit = habits.find(h => h.id === l.habitId);
+      return habit?.timeOfDay === 'morning' && l.completed;
+    }).length;
+    
+    const eveningCompletions = logs.filter(l => {
+      const habit = habits.find(h => h.id === l.habitId);
+      return habit?.timeOfDay === 'evening' && l.completed;
+    }).length;
+    
+    const weekendDays = [0, 6]; // Sunday, Saturday
+    const weekendCompletions = logs.filter(l => {
+      const date = new Date(l.date);
+      return weekendDays.includes(date.getDay()) && l.completed;
+    }).length;
+    
+    const weekdayCompletions = logs.filter(l => {
+      const date = new Date(l.date);
+      return !weekendDays.includes(date.getDay()) && l.completed;
+    }).length;
+    
+    // Calculate consistency (standard deviation of daily completions)
+    const dailyCounts: Record<string, number> = {};
+    logs.forEach(l => {
+      if (l.completed) {
+        dailyCounts[l.date] = (dailyCounts[l.date] || 0) + 1;
+      }
+    });
+    const counts = Object.values(dailyCounts);
+    const avg = counts.reduce((a, b) => a + b, 0) / counts.length;
+    const variance = counts.reduce((sum, count) => sum + Math.pow(count - avg, 2), 0) / counts.length;
+    const consistency = 1 / (1 + Math.sqrt(variance));
+    
+    // Determine DNA type
+    if (morningCompletions > eveningCompletions * 1.5) {
+      return { type: 'Morning Champion', icon: '🌅', description: 'You thrive in the early hours! Your best work happens before noon.', color: 'from-orange-400 to-yellow-500' };
+    } else if (eveningCompletions > morningCompletions * 1.5) {
+      return { type: 'Night Owl', icon: '🦉', description: 'You come alive after dark! Evenings are your power time.', color: 'from-purple-400 to-indigo-500' };
+    } else if (weekendCompletions > weekdayCompletions * 1.3) {
+      return { type: 'Weekend Warrior', icon: '🎉', description: 'You shine on weekends! Free time fuels your best habits.', color: 'from-pink-400 to-rose-500' };
+    } else if (consistency > 0.8) {
+      return { type: 'Consistent Warrior', icon: '⚔️', description: 'Unstoppable consistency! You show up every single day.', color: 'from-red-400 to-orange-500' };
+    } else {
+      return { type: 'Balanced Achiever', icon: '⚖️', description: 'Well-rounded and adaptable! You find success in all areas.', color: 'from-blue-400 to-cyan-500' };
+    }
+  };
+  
+  const dna = analyzeDNA();
+  
+  return (
+    <div className={`bg-gradient-to-br ${dna.color} rounded-2xl p-4 shadow-sm text-white`}>
+      <div className="flex items-center gap-2 mb-2">
+        <span className="text-3xl">{dna.icon}</span>
+        <div>
+          <div className="text-xs opacity-80">Your Habit DNA</div>
+          <div className="font-bold text-lg">{dna.type}</div>
+        </div>
+      </div>
+      <div className="text-sm opacity-90">{dna.description}</div>
+    </div>
+  );
+}
+
+// ===== EXPORT ACHIEVEMENT CARD =====
+function ExportAchievement({ userStats, habits, logs }: {
+  userStats: { totalXp: number; level: number; achievements: Array<{ name: string; icon: string }> };
+  habits: Habit[];
+  logs: Array<{ date: string; completed: boolean }>;
+}) {
+  const [showExport, setShowExport] = useState(false);
+  
+  const totalCompletions = logs.filter(l => l.completed).length;
+  const activeHabits = habits.filter(h => !h.archived).length;
+  const achievementsUnlocked = userStats.achievements.length;
+  
+  const handleExport = () => {
+    // Create a simple text summary
+    const summary = `
+🔥 KINDLING ACHIEVEMENT CARD 🔥
+
+Level: ${userStats.level}
+Total XP: ${userStats.totalXp.toLocaleString()}
+Active Habits: ${activeHabits}
+Total Completions: ${totalCompletions}
+Achievements Unlocked: ${achievementsUnlocked}
+
+Recent Achievements:
+${userStats.achievements.slice(-5).map(a => `${a.icon} ${a.name}`).join('\n')}
+
+Keep kindling your daily fire! 🔥
+    `.trim();
+    
+    // Copy to clipboard
+    navigator.clipboard.writeText(summary);
+    alert('Achievement card copied to clipboard! Share it with friends! 🎉');
+  };
+  
+  return (
+    <div className="bg-gradient-to-br from-indigo-50 to-purple-100 rounded-2xl p-4 shadow-sm border border-indigo-200">
+      <div className="flex items-center justify-between mb-3">
+        <div className="flex items-center gap-2">
+          <span className="text-2xl">🎴</span>
+          <h3 className="font-bold text-gray-800">Share Progress</h3>
+        </div>
+        <button
+          onClick={() => setShowExport(!showExport)}
+          className="text-sm text-indigo-600 hover:text-indigo-700 font-medium"
+        >
+          {showExport ? 'Hide' : 'View'}
+        </button>
+      </div>
+      
+      {showExport && (
+        <motion.div
+          initial={{ opacity: 0, height: 0 }}
+          animate={{ opacity: 1, height: 'auto' }}
+          className="space-y-3"
+        >
+          <div className="bg-white/60 rounded-lg p-3 text-center">
+            <div className="text-4xl mb-2">🔥</div>
+            <div className="text-2xl font-bold text-gray-800">Level {userStats.level}</div>
+            <div className="text-sm text-gray-600">{userStats.totalXp.toLocaleString()} XP</div>
+            <div className="flex justify-center gap-4 mt-3 text-xs text-gray-600">
+              <div>
+                <div className="text-lg font-bold text-gray-800">{activeHabits}</div>
+                <div>Habits</div>
+              </div>
+              <div>
+                <div className="text-lg font-bold text-gray-800">{totalCompletions}</div>
+                <div>Completions</div>
+              </div>
+              <div>
+                <div className="text-lg font-bold text-gray-800">{achievementsUnlocked}</div>
+                <div>Achievements</div>
+              </div>
+            </div>
+          </div>
+          
+          <button
+            onClick={handleExport}
+            className="w-full py-2 bg-indigo-600 text-white text-sm rounded-lg hover:bg-indigo-700"
+          >
+            📋 Copy to Clipboard
+          </button>
+        </motion.div>
+      )}
+    </div>
+  );
+}
+
+// ===== SOUND SELECTOR =====
+function SoundSelector({ selectedSound, onSelectSound }: {
+  selectedSound: string;
+  onSelectSound: (sound: string) => void;
+}) {
+  const sounds = [
+    { id: 'default', name: 'Default', icon: '🔔' },
+    { id: 'chime', name: 'Chime', icon: '🎵' },
+    { id: 'bell', name: 'Bell', icon: '🔔' },
+    { id: 'pop', name: 'Pop', icon: '💥' },
+    { id: 'success', name: 'Success', icon: '✨' },
+    { id: 'none', name: 'Silent', icon: '🔇' },
+  ];
+  
+  return (
+    <div className="bg-white/70 backdrop-blur-md rounded-3xl p-5 shadow-lg border border-white/50">
+      <div className="flex items-center gap-2 mb-3">
+        <span className="text-2xl">🔊</span>
+        <h3 className="font-bold text-gray-800">Sound Effects</h3>
+      </div>
+      
+      <div className="grid grid-cols-3 gap-2">
+        {sounds.map((sound) => (
+          <button
+            key={sound.id}
+            onClick={() => onSelectSound(sound.id)}
+            className={`p-3 rounded-lg text-center transition-all ${
+              selectedSound === sound.id
+                ? 'bg-orange-500 text-white shadow-md'
+                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+            }`}
+          >
+            <div className="text-2xl mb-1">{sound.icon}</div>
+            <div className="text-xs font-medium">{sound.name}</div>
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 // ===== WATER BOTTLE =====
 function WaterBottle({ glasses, goal, onAdd, onRemove }: { glasses: number; goal: number; onAdd: () => void; onRemove: () => void }) {
   const fillPercent = Math.min((glasses / goal) * 100, 100);
@@ -1466,6 +1731,8 @@ export default function App() {
     setSelectedTheme,
     // Time Capsules & Reflections
     timeCapsules, reflections, createTimeCapsule, openTimeCapsule, createReflection,
+    // Additional gamification
+    addXp,
   } = useHabits();
 
   const [view, setView] = useState<'week' | 'month' | 'analytics'>('week');
@@ -1482,6 +1749,27 @@ export default function App() {
   const [filterCategory, setFilterCategory] = useState<string>('all');
   const [showArchived, setShowArchived] = useState(false);
   const [showOnboarding, setShowOnboarding] = useState(false);
+  const [selectedSound, setSelectedSound] = useState('default');
+  const [challenges, setChallenges] = useState([
+    { id: '1', name: '7-Day Mindfulness', icon: '🧘', days: 7, description: 'Meditate every day for a week', category: 'Mind', joined: false, progress: 0 },
+    { id: '2', name: '21-Day Fitness', icon: '💪', days: 21, description: 'Build an exercise habit', category: 'Fitness', joined: false, progress: 0 },
+    { id: '3', name: '30-Day Reading', icon: '📚', days: 30, description: 'Read every day for a month', category: 'Learning', joined: false, progress: 0 },
+    { id: '4', name: 'Hydration Hero', icon: '💧', days: 14, description: 'Drink 8 glasses daily', category: 'Health', joined: false, progress: 0 },
+  ]);
+
+  const handleJoinChallenge = (challengeId: string) => {
+    setChallenges(prev => prev.map(c => 
+      c.id === challengeId ? { ...c, joined: true, startDate: new Date().toISOString() } : c
+    ));
+  };
+
+  const handleCompleteChallenge = (challengeId: string) => {
+    setChallenges(prev => prev.map(c => 
+      c.id === challengeId ? { ...c, joined: false, progress: 0 } : c
+    ));
+    addXp(100);
+    confetti({ particleCount: 100, spread: 70, origin: { y: 0.6 } });
+  };
 
   const greeting = useMemo(() => {
     const hour = new Date().getHours();
@@ -1807,6 +2095,30 @@ export default function App() {
         {/* Habit Heatmap */}
         <div className="mb-4">
           <HabitHeatmap logs={logs} habits={habits} />
+        </div>
+
+        {/* Habit DNA Analysis */}
+        <div className="mb-4">
+          <HabitDNA logs={logs} habits={habits} />
+        </div>
+
+        {/* Habit Challenges */}
+        <div className="mb-4">
+          <HabitChallenges
+            challenges={challenges}
+            onJoin={handleJoinChallenge}
+            onComplete={handleCompleteChallenge}
+          />
+        </div>
+
+        {/* Export Achievement Card */}
+        <div className="mb-4">
+          <ExportAchievement userStats={userStats} habits={habits} logs={logs} />
+        </div>
+
+        {/* Sound Selector */}
+        <div className="mb-4">
+          <SoundSelector selectedSound={selectedSound} onSelectSound={setSelectedSound} />
         </div>
 
         {/* View toggle */}
