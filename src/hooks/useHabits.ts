@@ -77,18 +77,13 @@ function generateSeedLogs(habits: Habit[]): HabitLog[] {
 }
 
 export function useHabits() {
+  // Initialize with seed data if no data exists in localStorage
   const [habits, setHabits] = useLocalStorage<Habit[]>('kindling-habits', SEED_HABITS);
-  const [logs, setLogs] = useLocalStorage<HabitLog[]>('kindling-logs', () => generateSeedLogs(SEED_HABITS));
+  const [logs, setLogs] = useLocalStorage<HabitLog[]>('kindling-logs', generateSeedLogs(SEED_HABITS));
   const [waterLogs, setWaterLogs] = useLocalStorage<WaterLog[]>('kindling-water', []);
   const [mealLogs, setMealLogs] = useLocalStorage<MealLog[]>('kindling-meals', []);
   const [reminders, setReminders] = useLocalStorage<Reminder[]>('kindling-reminders', []);
   const [deletedHabit, setDeletedHabit] = useState<Habit | null>(null);
-
-  // Initialize seed logs if empty
-  if (logs.length === 0 && habits.some(h => h.id.startsWith('seed-'))) {
-    const seedLogs = generateSeedLogs(habits);
-    setLogs(seedLogs);
-  }
 
   const toggleHabit = useCallback((habitId: string, date: string) => {
     setLogs(prev => {
