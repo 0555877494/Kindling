@@ -1,353 +1,1143 @@
-import { useState } from 'react';
-import { usePomodoro, TimerMode } from './hooks/usePomodoro';
+import { useState, useEffect } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { format, subDays, addDays, startOfWeek, startOfMonth, endOfMonth, eachDayOfInterval, isToday as isTodayFn, getDay } from 'date-fns';
+import { Plus, X, Trash2, Edit3, ChevronLeft, ChevronRight, Droplets, UtensilsCrossed, Bell, Check, Flame, Calendar, BarChart3, Undo2, Sun, Moon, Sunrise, Sparkles } from 'lucide-react';
+import { useHabits } from './hooks/useHabits';
+import { Habit, TimeOfDay, Weekday, HABIT_COLORS, TIME_OF_DAY_LABELS, WEEKDAY_NAMES } from './types';
+import confetti from 'canvas-confetti';
 
-function formatTime(seconds: number): string {
-  const mins = Math.floor(seconds / 60);
-  const secs = seconds % 60;
-  return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
-}
-
-function CircularProgress({ progress, mode }: { progress: number; mode: TimerMode }) {
-  const radius = 140;
-  const stroke = 8;
-  const normalizedRadius = radius - stroke / 2;
-  const circumference = normalizedRadius * 2 * Math.PI;
-  const strokeDashoffset = circumference - progress * circumference;
-
-  const colorMap = {
-    focus: '#ef4444',
-    shortBreak: '#10b981',
-    longBreak: '#3b82f6',
-  };
-
-  const bgColorMap = {
-    focus: 'rgba(239, 68, 68, 0.1)',
-    shortBreak: 'rgba(16, 185, 129, 0.1)',
-    longBreak: 'rgba(59, 130, 246, 0.1)',
-  };
+// ===== EMBER BACKGROUND =====
+function EmberBackground() {
+  const embers = Array.from({ length: 15 }, (_, i) => ({
+    id: i,
+    x: Math.random() * 100,
+    delay: Math.random() * 8,
+    duration: 8 + Math.random() * 12,
+    size: 2 + Math.random() * 4,
+  }));
 
   return (
-    <svg height={radius * 2} width={radius * 2} className="transform -rotate-90">
-      {/* Background circle */}
-      <circle
-        stroke={bgColorMap[mode]}
-        fill="transparent"
-        strokeWidth={stroke}
-        r={normalizedRadius}
-        cx={radius}
-        cy={radius}
-      />
-      {/* Progress circle */}
-      <circle
-        stroke={colorMap[mode]}
-        fill="transparent"
-        strokeWidth={stroke}
-        strokeDasharray={circumference + ' ' + circumference}
-        style={{ 
-          strokeDashoffset,
-          transition: 'stroke-dashoffset 0.5s ease',
-          strokeLinecap: 'round'
-        }}
-        r={normalizedRadius}
-        cx={radius}
-        cy={radius}
-      />
-    </svg>
-  );
-}
-
-function ModeSelector({ mode, onModeChange }: { mode: TimerMode; onModeChange: (mode: TimerMode) => void }) {
-  const modes: { key: TimerMode; label: string; icon: string }[] = [
-    { key: 'focus', label: 'Focus', icon: '🎯' },
-    { key: 'shortBreak', label: 'Short Break', icon: '☕' },
-    { key: 'longBreak', label: 'Long Break', icon: '🌿' },
-  ];
-
-  return (
-    <div className="flex gap-2 bg-white/50 backdrop-blur-sm rounded-2xl p-1.5 shadow-sm">
-      {modes.map(m => (
-        <button
-          key={m.key}
-          onClick={() => onModeChange(m.key)}
-          className={`px-4 py-2.5 rounded-xl text-sm font-medium transition-all duration-300 ${
-            mode === m.key
-              ? 'bg-white shadow-md text-gray-800 scale-105'
-              : 'text-gray-500 hover:text-gray-700 hover:bg-white/50'
-          }`}
-        >
-          <span className="mr-1.5">{m.icon}</span>
-          {m.label}
-        </button>
+    <div className="fixed inset-0 pointer-events-none overflow-hidden z-0">
+      {/* Paper grain texture */}
+      <div className="absolute inset-0 opacity-[0.03]" style={{
+        backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E")`,
+      }} />
+      {/* Floating embers */}
+      {embers.map(ember => (
+        <motion.div
+          key={ember.id}
+          className="absolute rounded-full"
+          style={{
+            left: `${ember.x}%`,
+            bottom: '-10px',
+            width: ember.size,
+            height: ember.size,
+            background: `radial-gradient(circle, rgba(251, 146, 60, 0.8), rgba(251, 146, 60, 0))`,
+          }}
+          animate={{
+            y: [0, -800],
+            x: [0, Math.sin(ember.id) * 50],
+            opacity: [0, 0.8, 0],
+            scale: [0.5, 1, 0.3],
+          }}
+          transition={{
+            duration: ember.duration,
+            delay: ember.delay,
+            repeat: Infinity,
+            ease: 'easeOut',
+          }}
+        />
       ))}
     </div>
   );
 }
 
-function Controls({ isRunning, onStart, onPause, onReset }: {
-  isRunning: boolean;
-  onStart: () => void;
-  onPause: () => void;
-  onReset: () => void;
-}) {
+// ===== FLAME ICON =====
+function FlameIcon({ className = '' }: { className?: string }) {
   return (
-    <div className="flex items-center gap-4">
-      <button
-        onClick={onReset}
-        className="w-12 h-12 rounded-full bg-white/60 backdrop-blur-sm shadow-sm flex items-center justify-center text-gray-500 hover:text-gray-700 hover:bg-white/80 transition-all duration-200 hover:scale-105"
-        title="Reset"
+    <motion.div
+      className={`relative ${className}`}
+      animate={{ scale: [1, 1.05, 1], rotate: [-1, 1, -1] }}
+      transition={{ duration: 2, repeat: Infinity, ease: 'easeInOut' }}
+    >
+      <Flame className="w-6 h-6 text-orange-500" />
+      <motion.div
+        className="absolute inset-0"
+        animate={{ opacity: [0.3, 0.7, 0.3] }}
+        transition={{ duration: 1.5, repeat: Infinity }}
       >
-        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-          <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-        </svg>
-      </button>
+        <Flame className="w-6 h-6 text-amber-400 blur-[1px]" />
+      </motion.div>
+    </motion.div>
+  );
+}
+
+// ===== WATER BOTTLE =====
+function WaterBottle({ glasses, goal, onAdd, onRemove }: { glasses: number; goal: number; onAdd: () => void; onRemove: () => void }) {
+  const fillPercent = Math.min((glasses / goal) * 100, 100);
+  const isComplete = glasses >= goal;
+
+  return (
+    <motion.div
+      className="bg-white/70 backdrop-blur-md rounded-3xl p-5 shadow-lg border border-white/50"
+      whileHover={{ y: -2, scale: 1.01 }}
+      transition={{ type: 'spring', stiffness: 300 }}
+    >
+      <div className="flex items-center gap-3 mb-4">
+        <Droplets className="w-5 h-5 text-sky-500" />
+        <h3 className="font-semibold text-gray-800">Water Intake</h3>
+        <span className="ml-auto text-sm text-gray-500">{glasses}/{goal} glasses</span>
+      </div>
       
-      <button
-        onClick={isRunning ? onPause : onStart}
-        className={`w-16 h-16 rounded-full shadow-lg flex items-center justify-center text-white transition-all duration-200 hover:scale-110 active:scale-95 ${
-          isRunning 
-            ? 'bg-gradient-to-br from-amber-400 to-orange-500 shadow-orange-200' 
-            : 'bg-gradient-to-br from-emerald-400 to-green-500 shadow-green-200'
-        }`}
-      >
-        {isRunning ? (
-          <svg className="w-7 h-7" fill="currentColor" viewBox="0 0 24 24">
-            <rect x="6" y="4" width="4" height="16" rx="1" />
-            <rect x="14" y="4" width="4" height="16" rx="1" />
-          </svg>
-        ) : (
-          <svg className="w-7 h-7 ml-1" fill="currentColor" viewBox="0 0 24 24">
-            <path d="M8 5v14l11-7z" />
-          </svg>
-        )}
-      </button>
+      <div className="flex items-end gap-4">
+        {/* Bottle */}
+        <div className="relative w-16 h-32 rounded-b-2xl rounded-t-lg border-2 border-sky-200 overflow-hidden bg-sky-50/50">
+          {/* Water fill */}
+          <motion.div
+            className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-sky-400 to-sky-300"
+            animate={{ height: `${fillPercent}%` }}
+            transition={{ type: 'spring', stiffness: 100, damping: 15 }}
+          >
+            {/* Wave effect */}
+            <motion.div
+              className="absolute top-0 left-0 right-0 h-2 bg-sky-300/50 rounded-full"
+              animate={{ x: [-5, 5, -5], scaleY: [1, 1.3, 1] }}
+              transition={{ duration: 2, repeat: Infinity, ease: 'easeInOut' }}
+            />
+          </motion.div>
+          {/* Bottle neck */}
+          <div className="absolute top-0 left-1/2 -translate-x-1/2 w-8 h-3 bg-sky-100 border-b border-sky-200 rounded-b-sm" />
+        </div>
 
-      <div className="w-12 h-12" /> {/* Spacer for symmetry */}
-    </div>
+        {/* Controls */}
+        <div className="flex-1">
+          <div className="flex gap-2 mb-3">
+            <motion.button
+              onClick={onRemove}
+              disabled={glasses === 0}
+              className="w-10 h-10 rounded-xl bg-sky-100 text-sky-600 flex items-center justify-center font-bold disabled:opacity-30 hover:bg-sky-200 transition-colors"
+              whileTap={{ scale: 0.9 }}
+            >
+              −
+            </motion.button>
+            <motion.button
+              onClick={onAdd}
+              className="flex-1 h-10 rounded-xl bg-sky-500 text-white flex items-center justify-center font-medium text-sm hover:bg-sky-600 transition-colors shadow-md shadow-sky-200"
+              whileTap={{ scale: 0.95 }}
+            >
+              <Droplets className="w-4 h-4 mr-1.5" />
+              Add a glass
+            </motion.button>
+          </div>
+          {isComplete && (
+            <motion.div
+              initial={{ opacity: 0, y: 5 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="text-xs text-emerald-600 font-medium flex items-center gap-1"
+            >
+              <Check className="w-3 h-3" /> Goal reached! 🎉
+            </motion.div>
+          )}
+        </div>
+      </div>
+    </motion.div>
   );
 }
 
-function Statistics({ todayPomodoros, todayFocusMinutes, weekFocusMinutes, completedPomodoros }: {
-  todayPomodoros: number;
-  todayFocusMinutes: number;
-  weekFocusMinutes: number;
-  completedPomodoros: number;
+// ===== MEAL TRACKER =====
+function MealTracker({ meals, onToggle }: { 
+  meals: { breakfast: boolean; lunch: boolean; dinner: boolean; snack: boolean };
+  onToggle: (meal: 'breakfast' | 'lunch' | 'dinner' | 'snack') => void;
 }) {
-  return (
-    <div className="grid grid-cols-2 gap-3 w-full max-w-sm">
-      <div className="bg-white/60 backdrop-blur-sm rounded-2xl p-4 shadow-sm text-center">
-        <div className="text-2xl font-bold text-gray-800">{todayPomodoros}</div>
-        <div className="text-xs text-gray-500 mt-1">Today's Sessions</div>
-      </div>
-      <div className="bg-white/60 backdrop-blur-sm rounded-2xl p-4 shadow-sm text-center">
-        <div className="text-2xl font-bold text-gray-800">{todayFocusMinutes}<span className="text-sm font-normal text-gray-400">m</span></div>
-        <div className="text-xs text-gray-500 mt-1">Today's Focus</div>
-      </div>
-      <div className="bg-white/60 backdrop-blur-sm rounded-2xl p-4 shadow-sm text-center">
-        <div className="text-2xl font-bold text-gray-800">{Math.round(weekFocusMinutes / 60)}<span className="text-sm font-normal text-gray-400">h</span></div>
-        <div className="text-xs text-gray-500 mt-1">Weekly Focus</div>
-      </div>
-      <div className="bg-white/60 backdrop-blur-sm rounded-2xl p-4 shadow-sm text-center">
-        <div className="text-2xl font-bold text-gray-800">{completedPomodoros}</div>
-        <div className="text-xs text-gray-500 mt-1">Total Sessions</div>
-      </div>
-    </div>
-  );
-}
+  const mealItems: { key: 'breakfast' | 'lunch' | 'dinner' | 'snack'; label: string; emoji: string }[] = [
+    { key: 'breakfast', label: 'Breakfast', emoji: '🥣' },
+    { key: 'lunch', label: 'Lunch', emoji: '🥗' },
+    { key: 'dinner', label: 'Dinner', emoji: '🍽️' },
+    { key: 'snack', label: 'Snack', emoji: '🍎' },
+  ];
 
-function Settings({ settings, onUpdate, onClose }: {
-  settings: { focus: number; shortBreak: number; longBreak: number; longBreakInterval: number };
-  onUpdate: (s: Partial<{ focus: number; shortBreak: number; longBreak: number; longBreakInterval: number }>) => void;
-  onClose: () => void;
-}) {
-  return (
-    <div className="fixed inset-0 bg-black/30 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={onClose}>
-      <div className="bg-white rounded-3xl p-6 w-full max-w-sm shadow-2xl" onClick={e => e.stopPropagation()}>
-        <div className="flex items-center justify-between mb-6">
-          <h2 className="text-xl font-bold text-gray-800">Settings</h2>
-          <button onClick={onClose} className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center text-gray-500 hover:bg-gray-200 transition-colors">
-            ✕
-          </button>
-        </div>
-
-        <div className="space-y-5">
-          <div>
-            <label className="text-sm font-medium text-gray-600 mb-2 block">Focus Duration (minutes)</label>
-            <div className="flex items-center gap-3">
-              <input
-                type="range"
-                min="1"
-                max="60"
-                value={settings.focus}
-                onChange={e => onUpdate({ focus: parseInt(e.target.value) })}
-                className="flex-1 h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-red-500"
-              />
-              <span className="w-10 text-center font-bold text-gray-700">{settings.focus}</span>
-            </div>
-          </div>
-
-          <div>
-            <label className="text-sm font-medium text-gray-600 mb-2 block">Short Break (minutes)</label>
-            <div className="flex items-center gap-3">
-              <input
-                type="range"
-                min="1"
-                max="30"
-                value={settings.shortBreak}
-                onChange={e => onUpdate({ shortBreak: parseInt(e.target.value) })}
-                className="flex-1 h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-emerald-500"
-              />
-              <span className="w-10 text-center font-bold text-gray-700">{settings.shortBreak}</span>
-            </div>
-          </div>
-
-          <div>
-            <label className="text-sm font-medium text-gray-600 mb-2 block">Long Break (minutes)</label>
-            <div className="flex items-center gap-3">
-              <input
-                type="range"
-                min="5"
-                max="45"
-                value={settings.longBreak}
-                onChange={e => onUpdate({ longBreak: parseInt(e.target.value) })}
-                className="flex-1 h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-blue-500"
-              />
-              <span className="w-10 text-center font-bold text-gray-700">{settings.longBreak}</span>
-            </div>
-          </div>
-
-          <div>
-            <label className="text-sm font-medium text-gray-600 mb-2 block">Long Break After (sessions)</label>
-            <div className="flex items-center gap-3">
-              <input
-                type="range"
-                min="2"
-                max="8"
-                value={settings.longBreakInterval}
-                onChange={e => onUpdate({ longBreakInterval: parseInt(e.target.value) })}
-                className="flex-1 h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-purple-500"
-              />
-              <span className="w-10 text-center font-bold text-gray-700">{settings.longBreakInterval}</span>
-            </div>
-          </div>
-        </div>
-
-        <button
-          onClick={onClose}
-          className="w-full mt-6 py-3 bg-gradient-to-r from-gray-800 to-gray-900 text-white rounded-xl font-medium hover:opacity-90 transition-opacity"
-        >
-          Done
-        </button>
-      </div>
-    </div>
-  );
-}
-
-export default function App() {
-  const {
-    mode,
-    timeLeft,
-    isRunning,
-    completedPomodoros,
-    settings,
-    todayFocusMinutes,
-    todayPomodoros,
-    weekFocusMinutes,
-    start,
-    pause,
-    reset,
-    switchMode,
-    updateSettings,
-  } = usePomodoro();
-
-  const [showSettings, setShowSettings] = useState(false);
-
-  const totalDuration = mode === 'focus' ? settings.focus * 60 :
-                        mode === 'shortBreak' ? settings.shortBreak * 60 :
-                        settings.longBreak * 60;
-  const progress = (totalDuration - timeLeft) / totalDuration;
-
-  const modeLabels = {
-    focus: 'Focus Time',
-    shortBreak: 'Short Break',
-    longBreak: 'Long Break',
-  };
-
-  const bgGradients = {
-    focus: 'from-red-50 via-orange-50 to-amber-50',
-    shortBreak: 'from-emerald-50 via-teal-50 to-green-50',
-    longBreak: 'from-blue-50 via-indigo-50 to-purple-50',
-  };
+  const completed = Object.values(meals).filter(Boolean).length;
 
   return (
-    <div className={`min-h-screen bg-gradient-to-br ${bgGradients[mode]} transition-colors duration-700 flex flex-col items-center justify-center p-4`}>
-      {/* Header */}
-      <div className="w-full max-w-md flex items-center justify-between mb-8">
-        <h1 className="text-lg font-bold text-gray-700 flex items-center gap-2">
-          <span className="text-2xl">🍅</span> Pomodoro
-        </h1>
-        <button
-          onClick={() => setShowSettings(true)}
-          className="w-10 h-10 rounded-full bg-white/60 backdrop-blur-sm shadow-sm flex items-center justify-center text-gray-500 hover:text-gray-700 hover:bg-white/80 transition-all duration-200"
-        >
-          <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.066 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.573 1.066c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.066-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-            <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-          </svg>
-        </button>
+    <motion.div
+      className="bg-white/70 backdrop-blur-md rounded-3xl p-5 shadow-lg border border-white/50"
+      whileHover={{ y: -2, scale: 1.01 }}
+      transition={{ type: 'spring', stiffness: 300 }}
+    >
+      <div className="flex items-center gap-3 mb-4">
+        <UtensilsCrossed className="w-5 h-5 text-amber-500" />
+        <h3 className="font-semibold text-gray-800">Today's Meals</h3>
+        <span className="ml-auto text-sm text-gray-500">{completed}/4</span>
       </div>
-
-      {/* Mode Selector */}
-      <ModeSelector mode={mode} onModeChange={switchMode} />
-
-      {/* Timer */}
-      <div className="relative my-8 flex items-center justify-center">
-        <CircularProgress progress={progress} mode={mode} />
-        <div className="absolute inset-0 flex flex-col items-center justify-center">
-          <div className="text-sm font-medium text-gray-400 mb-1">{modeLabels[mode]}</div>
-          <div className="text-6xl font-bold text-gray-800 tracking-tight font-mono">
-            {formatTime(timeLeft)}
-          </div>
-          <div className="text-xs text-gray-400 mt-2">
-            {isRunning ? '● Running' : '○ Paused'}
-          </div>
+      
+      {/* Plate visualization */}
+      <div className="relative w-24 h-24 mx-auto mb-4">
+        <div className="absolute inset-0 rounded-full border-4 border-amber-100 bg-amber-50/50" />
+        <motion.div
+          className="absolute inset-2 rounded-full bg-gradient-to-br from-amber-200 to-orange-200"
+          animate={{ scale: [1, 1.02, 1] }}
+          transition={{ duration: 3, repeat: Infinity }}
+        />
+        <div className="absolute inset-0 flex items-center justify-center text-2xl">
+          {completed === 4 ? '🎉' : completed > 0 ? '🍴' : '🍽️'}
         </div>
       </div>
 
-      {/* Controls */}
-      <Controls isRunning={isRunning} onStart={start} onPause={pause} onReset={reset} />
-
-      {/* Pomodoro indicators */}
-      <div className="flex gap-2 mt-6">
-        {Array.from({ length: settings.longBreakInterval }).map((_, i) => (
-          <div
-            key={i}
-            className={`w-3 h-3 rounded-full transition-all duration-300 ${
-              i < (completedPomodoros % settings.longBreakInterval)
-                ? 'bg-red-400 scale-110'
-                : 'bg-gray-200'
+      <div className="grid grid-cols-2 gap-2">
+        {mealItems.map(item => (
+          <motion.button
+            key={item.key}
+            onClick={() => onToggle(item.key)}
+            className={`p-2.5 rounded-xl text-sm font-medium flex items-center gap-2 transition-all ${
+              meals[item.key]
+                ? 'bg-emerald-100 text-emerald-700 shadow-sm'
+                : 'bg-gray-50 text-gray-500 hover:bg-gray-100'
             }`}
-          />
+            whileTap={{ scale: 0.95 }}
+            whileHover={{ scale: 1.02 }}
+          >
+            <span>{item.emoji}</span>
+            <span>{item.label}</span>
+            {meals[item.key] && <Check className="w-3.5 h-3.5 ml-auto" />}
+          </motion.button>
+        ))}
+      </div>
+    </motion.div>
+  );
+}
+
+// ===== HABIT CHECK CELL =====
+function HabitCheckCell({ completed, active, color, onClick }: {
+  completed: boolean;
+  active: boolean;
+  color: string;
+  onClick: () => void;
+}) {
+  return (
+    <motion.button
+      onClick={onClick}
+      disabled={!active}
+      className={`w-9 h-9 rounded-lg flex items-center justify-center transition-all ${
+        !active ? 'bg-gray-100/50 cursor-default' :
+        completed ? 'shadow-md' : 'bg-white/60 hover:bg-white/90 border border-gray-200/50'
+      }`}
+      style={completed ? { backgroundColor: color + '20', borderColor: color + '40' } : {}}
+      whileTap={active ? { scale: 0.85 } : {}}
+      whileHover={active ? { scale: 1.1 } : {}}
+    >
+      {completed ? (
+        <motion.div
+          initial={{ scale: 0, rotate: -180 }}
+          animate={{ scale: 1, rotate: 0 }}
+          transition={{ type: 'spring', stiffness: 400, damping: 15 }}
+        >
+          <Check className="w-4 h-4" style={{ color }} />
+        </motion.div>
+      ) : active ? (
+        <div className="w-2 h-2 rounded-full bg-gray-300" />
+      ) : null}
+    </motion.button>
+  );
+}
+
+// ===== WEEK VIEW =====
+function WeekView({ habits, weekDays, todayStr, isHabitCompleted, isHabitActiveOnDate, toggleHabit, getStreak }: {
+  habits: Habit[];
+  weekDays: Date[];
+  todayStr: string;
+  isHabitCompleted: (id: string, date: string) => boolean;
+  isHabitActiveOnDate: (h: Habit, d: Date) => boolean;
+  toggleHabit: (id: string, date: string) => void;
+  getStreak: (id: string) => number;
+}) {
+  const handleCheck = (habitId: string, date: string) => {
+    toggleHabit(habitId, date);
+    const wasCompleted = isHabitCompleted(habitId, date);
+    if (!wasCompleted) {
+      // Small confetti burst
+      confetti({
+        particleCount: 8,
+        spread: 30,
+        startVelocity: 15,
+        origin: { x: 0.5, y: 0.5 },
+        colors: ['#f59e0b', '#10b981', '#8b5cf6'],
+        ticks: 60,
+        gravity: 1.5,
+        scalar: 0.8,
+      });
+    }
+  };
+
+  const timeIcon = (tod: TimeOfDay) => {
+    switch (tod) {
+      case 'morning': return <Sunrise className="w-3.5 h-3.5" />;
+      case 'afternoon': return <Sun className="w-3.5 h-3.5" />;
+      case 'evening': return <Moon className="w-3.5 h-3.5" />;
+      default: return <Sparkles className="w-3.5 h-3.5" />;
+    }
+  };
+
+  return (
+    <motion.div
+      className="bg-white/70 backdrop-blur-md rounded-3xl p-5 shadow-lg border border-white/50"
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.4 }}
+    >
+      <div className="flex items-center justify-between mb-4">
+        <h2 className="font-bold text-gray-800 text-lg">This Week</h2>
+        <div className="text-xs text-gray-400">
+          {format(weekDays[0], 'MMM d')} – {format(weekDays[6], 'MMM d')}
+        </div>
+      </div>
+
+      {/* Day headers */}
+      <div className="grid grid-cols-[1fr_repeat(7,auto)] gap-1.5 mb-3">
+        <div />
+        {weekDays.map(day => {
+          const isToday = format(day, 'yyyy-MM-dd') === todayStr;
+          return (
+            <div key={day.toISOString()} className={`w-9 text-center text-xs font-medium ${isToday ? 'text-orange-600' : 'text-gray-400'}`}>
+              <div>{WEEKDAY_NAMES[getDay(day)]}</div>
+              <div className={`text-sm font-bold ${isToday ? 'text-orange-600' : 'text-gray-600'}`}>
+                {format(day, 'd')}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Habit rows */}
+      <div className="space-y-2">
+        {habits.map(habit => {
+          const streak = getStreak(habit.id);
+          return (
+            <motion.div
+              key={habit.id}
+              className="grid grid-cols-[1fr_repeat(7,auto)] gap-1.5 items-center"
+              initial={{ opacity: 0, x: -10 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ delay: 0.05 }}
+            >
+              <div className="flex items-center gap-2 min-w-0 pr-2">
+                <div className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: habit.color }} />
+                <div className="min-w-0">
+                  <div className="text-sm font-medium text-gray-800 truncate">{habit.name}</div>
+                  <div className="flex items-center gap-1 text-[10px] text-gray-400">
+                    {timeIcon(habit.timeOfDay)}
+                    <span>{TIME_OF_DAY_LABELS[habit.timeOfDay]}</span>
+                    {streak > 0 && (
+                      <span className="ml-1 text-orange-500 font-medium">🔥{streak}</span>
+                    )}
+                  </div>
+                </div>
+              </div>
+              {weekDays.map(day => {
+                const dateStr = format(day, 'yyyy-MM-dd');
+                const active = isHabitActiveOnDate(habit, day);
+                const completed = isHabitCompleted(habit.id, dateStr);
+                return (
+                  <HabitCheckCell
+                    key={dateStr}
+                    completed={completed}
+                    active={active}
+                    color={habit.color}
+                    onClick={() => handleCheck(habit.id, dateStr)}
+                  />
+                );
+              })}
+            </motion.div>
+          );
+        })}
+      </div>
+
+      {habits.length === 0 && (
+        <div className="text-center py-8 text-gray-400 text-sm">
+          No habits yet. Add one to get started! 🌱
+        </div>
+      )}
+    </motion.div>
+  );
+}
+
+// ===== MONTH VIEW =====
+function MonthView({ habits, logs, isHabitActiveOnDate, isHabitCompleted }: {
+  habits: Habit[];
+  logs: { habitId: string; date: string; completed: boolean }[];
+  isHabitActiveOnDate: (h: Habit, d: Date) => boolean;
+  isHabitCompleted: (id: string, date: string) => boolean;
+}) {
+  const [currentMonth, setCurrentMonth] = useState(new Date());
+  const monthStart = startOfMonth(currentMonth);
+  const monthEnd = endOfMonth(currentMonth);
+  const days = eachDayOfInterval({ start: monthStart, end: monthEnd });
+  
+  // Pad start of month
+  const startPadding = getDay(monthStart) === 0 ? 6 : getDay(monthStart) - 1;
+
+  const getDayIntensity = (day: Date) => {
+    const activeHabits = habits.filter(h => isHabitActiveOnDate(h, day));
+    if (activeHabits.length === 0) return 0;
+    const completed = activeHabits.filter(h => isHabitCompleted(h.id, format(day, 'yyyy-MM-dd')));
+    return completed.length / activeHabits.length;
+  };
+
+  return (
+    <motion.div
+      className="bg-white/70 backdrop-blur-md rounded-3xl p-5 shadow-lg border border-white/50"
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+    >
+      <div className="flex items-center justify-between mb-4">
+        <button onClick={() => setCurrentMonth(subDays(currentMonth, 30))} className="p-1.5 rounded-lg hover:bg-gray-100">
+          <ChevronLeft className="w-4 h-4 text-gray-500" />
+        </button>
+        <h2 className="font-bold text-gray-800">{format(currentMonth, 'MMMM yyyy')}</h2>
+        <button onClick={() => setCurrentMonth(addDays(currentMonth, 30))} className="p-1.5 rounded-lg hover:bg-gray-100">
+          <ChevronRight className="w-4 h-4 text-gray-500" />
+        </button>
+      </div>
+
+      {/* Weekday headers */}
+      <div className="grid grid-cols-7 gap-1 mb-2">
+        {['M', 'T', 'W', 'T', 'F', 'S', 'S'].map((d, i) => (
+          <div key={i} className="text-center text-xs font-medium text-gray-400 py-1">{d}</div>
         ))}
       </div>
 
-      {/* Statistics */}
-      <div className="mt-8 w-full flex justify-center">
-        <Statistics
-          todayPomodoros={todayPomodoros}
-          todayFocusMinutes={todayFocusMinutes}
-          weekFocusMinutes={weekFocusMinutes}
-          completedPomodoros={completedPomodoros}
-        />
+      {/* Calendar grid */}
+      <div className="grid grid-cols-7 gap-1">
+        {Array.from({ length: startPadding }).map((_, i) => (
+          <div key={`pad-${i}`} className="aspect-square" />
+        ))}
+        {days.map(day => {
+          const intensity = getDayIntensity(day);
+          const isToday = isTodayFn(day);
+          return (
+            <motion.div
+              key={day.toISOString()}
+              className={`aspect-square rounded-lg flex items-center justify-center text-xs relative ${
+                isToday ? 'ring-2 ring-orange-400' : ''
+              }`}
+              style={{
+                backgroundColor: intensity > 0 
+                  ? `rgba(16, 185, 129, ${0.1 + intensity * 0.5})` 
+                  : 'rgba(243, 244, 246, 0.5)',
+              }}
+              whileHover={{ scale: 1.1 }}
+              transition={{ type: 'spring', stiffness: 400 }}
+            >
+              <span className={`${intensity > 0.5 ? 'text-emerald-800 font-bold' : 'text-gray-600'}`}>
+                {format(day, 'd')}
+              </span>
+            </motion.div>
+          );
+        })}
       </div>
 
-      {/* Settings Modal */}
-      {showSettings && (
-        <Settings
-          settings={settings}
-          onUpdate={updateSettings}
-          onClose={() => setShowSettings(false)}
-        />
-      )}
+      {/* Habit heatmap legend */}
+      <div className="mt-4 flex items-center justify-center gap-2 text-xs text-gray-400">
+        <span>Less</span>
+        {[0.1, 0.3, 0.5, 0.7, 0.9].map(intensity => (
+          <div
+            key={intensity}
+            className="w-4 h-4 rounded"
+            style={{ backgroundColor: `rgba(16, 185, 129, ${intensity})` }}
+          />
+        ))}
+        <span>More</span>
+      </div>
+
+      {/* Per-habit mini heatmaps */}
+      <div className="mt-4 space-y-2">
+        {habits.slice(0, 4).map(habit => (
+          <div key={habit.id} className="flex items-center gap-2">
+            <div className="w-2 h-2 rounded-full" style={{ backgroundColor: habit.color }} />
+            <span className="text-xs text-gray-600 w-20 truncate">{habit.name}</span>
+            <div className="flex gap-0.5 flex-1">
+              {days.slice(-28).map(day => {
+                const dateStr = format(day, 'yyyy-MM-dd');
+                const active = isHabitActiveOnDate(habit, day);
+                const completed = isHabitCompleted(habit.id, dateStr);
+                return (
+                  <div
+                    key={dateStr}
+                    className="flex-1 h-3 rounded-sm"
+                    style={{
+                      backgroundColor: !active ? '#f3f4f6' : completed ? habit.color + '80' : habit.color + '15',
+                    }}
+                  />
+                );
+              })}
+            </div>
+          </div>
+        ))}
+      </div>
+    </motion.div>
+  );
+}
+
+// ===== HABIT DETAIL DIALOG =====
+function HabitDetailDialog({ habit, onClose, getStreak, getBestStreak, getCompletionRate, logs, isHabitActiveOnDate, isHabitCompleted, onEdit, onDelete }: {
+  habit: Habit;
+  onClose: () => void;
+  getStreak: (id: string) => number;
+  getBestStreak: (id: string) => number;
+  getCompletionRate: (id: string, days?: number) => number;
+  logs: { habitId: string; date: string; completed: boolean }[];
+  isHabitActiveOnDate: (h: Habit, d: Date) => boolean;
+  isHabitCompleted: (id: string, date: string) => boolean;
+  onEdit: () => void;
+  onDelete: () => void;
+}) {
+  const streak = getStreak(habit.id);
+  const bestStreak = getBestStreak(habit.id);
+  const rate30 = getCompletionRate(habit.id, 30);
+  const rate7 = getCompletionRate(habit.id, 7);
+
+  // Last 16 weeks history
+  const historyWeeks = 16;
+  const today = new Date();
+  const historyDays = Array.from({ length: historyWeeks * 7 }, (_, i) => subDays(today, historyWeeks * 7 - 1 - i));
+
+  return (
+    <motion.div
+      className="fixed inset-0 bg-black/30 backdrop-blur-sm flex items-center justify-center z-50 p-4"
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      onClick={onClose}
+    >
+      <motion.div
+        className="bg-white rounded-3xl p-6 w-full max-w-md shadow-2xl max-h-[85vh] overflow-y-auto"
+        initial={{ scale: 0.9, y: 20 }}
+        animate={{ scale: 1, y: 0 }}
+        exit={{ scale: 0.9, y: 20 }}
+        transition={{ type: 'spring', stiffness: 300, damping: 25 }}
+        onClick={e => e.stopPropagation()}
+      >
+        {/* Header */}
+        <div className="flex items-start justify-between mb-4">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ backgroundColor: habit.color + '20' }}>
+              <div className="w-4 h-4 rounded-full" style={{ backgroundColor: habit.color }} />
+            </div>
+            <div>
+              <h2 className="font-bold text-gray-800 text-lg">{habit.name}</h2>
+              <p className="text-sm text-gray-500">{habit.description}</p>
+            </div>
+          </div>
+          <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-gray-100">
+            <X className="w-5 h-5 text-gray-400" />
+          </button>
+        </div>
+
+        {/* Stats grid */}
+        <div className="grid grid-cols-2 gap-3 mb-5">
+          <div className="bg-orange-50 rounded-2xl p-3 text-center">
+            <div className="text-2xl font-bold text-orange-600">{streak}</div>
+            <div className="text-xs text-orange-500 mt-0.5">Current Streak 🔥</div>
+          </div>
+          <div className="bg-purple-50 rounded-2xl p-3 text-center">
+            <div className="text-2xl font-bold text-purple-600">{bestStreak}</div>
+            <div className="text-xs text-purple-500 mt-0.5">Best Streak</div>
+          </div>
+          <div className="bg-emerald-50 rounded-2xl p-3 text-center">
+            <div className="text-2xl font-bold text-emerald-600">{rate30}%</div>
+            <div className="text-xs text-emerald-500 mt-0.5">30-day Rate</div>
+          </div>
+          <div className="bg-sky-50 rounded-2xl p-3 text-center">
+            <div className="text-2xl font-bold text-sky-600">{rate7}%</div>
+            <div className="text-xs text-sky-500 mt-0.5">7-day Rate</div>
+          </div>
+        </div>
+
+        {/* 16-week history */}
+        <div className="mb-5">
+          <div className="text-sm font-medium text-gray-600 mb-2">16-Week History</div>
+          <div className="space-y-1">
+            {Array.from({ length: historyWeeks }, (_, weekIdx) => (
+              <div key={weekIdx} className="flex gap-0.5">
+                {Array.from({ length: 7 }, (_, dayIdx) => {
+                  const day = historyDays[weekIdx * 7 + dayIdx];
+                  const dateStr = format(day, 'yyyy-MM-dd');
+                  const active = isHabitActiveOnDate(habit, day);
+                  const completed = isHabitCompleted(habit.id, dateStr);
+                  return (
+                    <div
+                      key={dayIdx}
+                      className="flex-1 h-3 rounded-sm"
+                      style={{
+                        backgroundColor: !active ? '#f3f4f6' : completed ? habit.color : habit.color + '15',
+                      }}
+                      title={`${format(day, 'MMM d')}: ${completed ? 'Done' : active ? 'Missed' : 'Off day'}`}
+                    />
+                  );
+                })}
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Actions */}
+        <div className="flex gap-2">
+          <button
+            onClick={onEdit}
+            className="flex-1 py-2.5 px-4 rounded-xl bg-gray-100 text-gray-700 font-medium text-sm hover:bg-gray-200 transition-colors flex items-center justify-center gap-2"
+          >
+            <Edit3 className="w-4 h-4" /> Edit
+          </button>
+          <button
+            onClick={onDelete}
+            className="py-2.5 px-4 rounded-xl bg-red-50 text-red-600 font-medium text-sm hover:bg-red-100 transition-colors flex items-center justify-center gap-2"
+          >
+            <Trash2 className="w-4 h-4" /> Delete
+          </button>
+        </div>
+      </motion.div>
+    </motion.div>
+  );
+}
+
+// ===== HABIT FORM DIALOG =====
+function HabitFormDialog({ habit, onClose, onSubmit }: {
+  habit?: Habit;
+  onClose: () => void;
+  onSubmit: (data: Omit<Habit, 'id' | 'createdAt'>) => void;
+}) {
+  const [name, setName] = useState(habit?.name ?? '');
+  const [description, setDescription] = useState(habit?.description ?? '');
+  const [timeOfDay, setTimeOfDay] = useState<TimeOfDay>(habit?.timeOfDay ?? 'morning');
+  const [activeDays, setActiveDays] = useState<Weekday[]>(habit?.activeDays ?? [0, 1, 2, 3, 4, 5, 6]);
+  const [color, setColor] = useState(habit?.color ?? HABIT_COLORS[0].value);
+
+  const toggleDay = (day: Weekday) => {
+    setActiveDays(prev => prev.includes(day) ? prev.filter(d => d !== day) : [...prev, day]);
+  };
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!name.trim()) return;
+    onSubmit({ name: name.trim(), description: description.trim(), timeOfDay, activeDays, color });
+  };
+
+  return (
+    <motion.div
+      className="fixed inset-0 bg-black/30 backdrop-blur-sm flex items-center justify-center z-50 p-4"
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      onClick={onClose}
+    >
+      <motion.div
+        className="bg-white rounded-3xl p-6 w-full max-w-md shadow-2xl"
+        initial={{ scale: 0.9, y: 20 }}
+        animate={{ scale: 1, y: 0 }}
+        exit={{ scale: 0.9, y: 20 }}
+        transition={{ type: 'spring', stiffness: 300, damping: 25 }}
+        onClick={e => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between mb-5">
+          <h2 className="text-xl font-bold text-gray-800">{habit ? 'Edit Habit' : 'New Habit'}</h2>
+          <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-gray-100">
+            <X className="w-5 h-5 text-gray-400" />
+          </button>
+        </div>
+
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div>
+            <label className="text-sm font-medium text-gray-600 mb-1.5 block">Name</label>
+            <input
+              type="text"
+              value={name}
+              onChange={e => setName(e.target.value)}
+              placeholder="e.g., Morning meditation"
+              className="w-full px-4 py-2.5 rounded-xl border border-gray-200 focus:border-orange-400 focus:ring-2 focus:ring-orange-100 outline-none transition-all text-gray-800"
+              autoFocus
+            />
+          </div>
+
+          <div>
+            <label className="text-sm font-medium text-gray-600 mb-1.5 block">What to do</label>
+            <input
+              type="text"
+              value={description}
+              onChange={e => setDescription(e.target.value)}
+              placeholder="e.g., 10 minutes of mindful breathing"
+              className="w-full px-4 py-2.5 rounded-xl border border-gray-200 focus:border-orange-400 focus:ring-2 focus:ring-orange-100 outline-none transition-all text-gray-800"
+            />
+          </div>
+
+          <div>
+            <label className="text-sm font-medium text-gray-600 mb-1.5 block">Time of day</label>
+            <div className="grid grid-cols-4 gap-2">
+              {(['morning', 'afternoon', 'evening', 'anytime'] as TimeOfDay[]).map(tod => (
+                <button
+                  key={tod}
+                  type="button"
+                  onClick={() => setTimeOfDay(tod)}
+                  className={`py-2 px-2 rounded-xl text-xs font-medium transition-all ${
+                    timeOfDay === tod
+                      ? 'bg-orange-100 text-orange-700 ring-2 ring-orange-300'
+                      : 'bg-gray-50 text-gray-500 hover:bg-gray-100'
+                  }`}
+                >
+                  {TIME_OF_DAY_LABELS[tod]}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div>
+            <label className="text-sm font-medium text-gray-600 mb-1.5 block">Days it counts</label>
+            <div className="flex gap-1.5">
+              {([1, 2, 3, 4, 5, 6, 0] as Weekday[]).map(day => (
+                <button
+                  key={day}
+                  type="button"
+                  onClick={() => toggleDay(day)}
+                  className={`w-9 h-9 rounded-lg text-xs font-medium transition-all ${
+                    activeDays.includes(day)
+                      ? 'bg-orange-500 text-white shadow-md shadow-orange-200'
+                      : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
+                  }`}
+                >
+                  {WEEKDAY_NAMES[day]}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div>
+            <label className="text-sm font-medium text-gray-600 mb-1.5 block">Color</label>
+            <div className="flex gap-2 flex-wrap">
+              {HABIT_COLORS.map(c => (
+                <button
+                  key={c.value}
+                  type="button"
+                  onClick={() => setColor(c.value)}
+                  className={`w-8 h-8 rounded-full transition-all ${
+                    color === c.value ? 'ring-2 ring-offset-2 scale-110' : 'hover:scale-110'
+                  }`}
+                  style={{ backgroundColor: c.value, outlineColor: color === c.value ? c.value : undefined }}
+                />
+              ))}
+            </div>
+          </div>
+
+          <button
+            type="submit"
+            disabled={!name.trim()}
+            className="w-full py-3 bg-gradient-to-r from-orange-500 to-amber-500 text-white rounded-xl font-medium shadow-lg shadow-orange-200 hover:shadow-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed mt-6"
+          >
+            {habit ? 'Save Changes' : 'Create Habit'}
+          </button>
+        </form>
+      </motion.div>
+    </motion.div>
+  );
+}
+
+// ===== REMINDER TOAST =====
+function ReminderToast({ message, onDismiss }: { message: string; onDismiss: () => void }) {
+  useEffect(() => {
+    const timer = setTimeout(onDismiss, 5000);
+    return () => clearTimeout(timer);
+  }, [onDismiss]);
+
+  return (
+    <motion.div
+      className="fixed top-4 right-4 bg-white rounded-2xl shadow-2xl p-4 flex items-center gap-3 z-50 border border-orange-100"
+      initial={{ x: 100, opacity: 0 }}
+      animate={{ x: 0, opacity: 1 }}
+      exit={{ x: 100, opacity: 0 }}
+      transition={{ type: 'spring', stiffness: 300, damping: 25 }}
+    >
+      <div className="w-10 h-10 rounded-full bg-orange-100 flex items-center justify-center">
+        <Bell className="w-5 h-5 text-orange-500" />
+      </div>
+      <div>
+        <div className="text-sm font-medium text-gray-800">{message}</div>
+        <div className="text-xs text-gray-400">Time to check in!</div>
+      </div>
+      <button onClick={onDismiss} className="p-1 rounded-lg hover:bg-gray-100">
+        <X className="w-4 h-4 text-gray-400" />
+      </button>
+    </motion.div>
+  );
+}
+
+// ===== MAIN APP =====
+export default function App() {
+  const {
+    habits,
+    logs,
+    todayProgress,
+    todayActiveHabits,
+    todayCompletedHabits,
+    weekDays,
+    todayStr,
+    toggleHabit,
+    isHabitCompleted,
+    isHabitActiveOnDate,
+    getStreak,
+    getBestStreak,
+    getCompletionRate,
+    addHabit,
+    updateHabit,
+    deleteHabit,
+    deletedHabit,
+    undoDelete,
+    getWaterForDate,
+    addWater,
+    removeWater,
+    getMealsForDate,
+    toggleMeal,
+    reminders,
+    addReminder,
+    toggleReminder,
+    deleteReminder,
+  } = useHabits();
+
+  const [view, setView] = useState<'week' | 'month'>('week');
+  const [showHabitForm, setShowHabitForm] = useState(false);
+  const [editingHabit, setEditingHabit] = useState<Habit | undefined>(undefined);
+  const [selectedHabit, setSelectedHabit] = useState<Habit | null>(null);
+  const [showReminders, setShowReminders] = useState(false);
+  const [reminderToast, setReminderToast] = useState<string | null>(null);
+  const [waterGoal, setWaterGoal] = useState(8);
+
+  // Update document title
+  useEffect(() => {
+    document.title = `Kindling — ${todayCompletedHabits.length}/${todayActiveHabits.length} today`;
+  }, [todayCompletedHabits.length, todayActiveHabits.length]);
+
+  // Simple reminder check
+  useEffect(() => {
+    const checkReminders = () => {
+      const now = new Date();
+      const currentTime = format(now, 'HH:mm');
+      reminders.forEach(r => {
+        if (r.enabled && r.time === currentTime) {
+          setReminderToast(r.message || `Time for your habit!`);
+        }
+      });
+    };
+    const interval = setInterval(checkReminders, 60000);
+    return () => clearInterval(interval);
+  }, [reminders]);
+
+  const handleAddHabit = (data: Omit<Habit, 'id' | 'createdAt'>) => {
+    if (editingHabit) {
+      updateHabit(editingHabit.id, data);
+    } else {
+      addHabit(data);
+    }
+    setShowHabitForm(false);
+    setEditingHabit(undefined);
+  };
+
+  const handleEditHabit = (habit: Habit) => {
+    setSelectedHabit(null);
+    setEditingHabit(habit);
+    setShowHabitForm(true);
+  };
+
+  const handleDeleteHabit = (habit: Habit) => {
+    deleteHabit(habit.id);
+    setSelectedHabit(null);
+  };
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-amber-50 via-orange-50 to-rose-50 relative">
+      <EmberBackground />
+
+      {/* Reminder toasts */}
+      <AnimatePresence>
+        {reminderToast && (
+          <ReminderToast message={reminderToast} onDismiss={() => setReminderToast(null)} />
+        )}
+      </AnimatePresence>
+
+      {/* Undo delete toast */}
+      <AnimatePresence>
+        {deletedHabit && (
+          <motion.div
+            className="fixed bottom-4 left-1/2 -translate-x-1/2 bg-gray-900 text-white rounded-2xl px-5 py-3 shadow-2xl flex items-center gap-3 z-50"
+            initial={{ y: 100, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            exit={{ y: 100, opacity: 0 }}
+          >
+            <span className="text-sm">Deleted "{deletedHabit.name}"</span>
+            <button onClick={undoDelete} className="text-orange-400 font-medium text-sm flex items-center gap-1 hover:text-orange-300">
+              <Undo2 className="w-3.5 h-3.5" /> Undo
+            </button>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Main content */}
+      <div className="relative z-10 max-w-lg mx-auto px-4 py-6">
+        {/* Header */}
+        <motion.header
+          className="flex items-center justify-between mb-6"
+          initial={{ opacity: 0, y: -10 }}
+          animate={{ opacity: 1, y: 0 }}
+        >
+          <div className="flex items-center gap-2">
+            <FlameIcon />
+            <h1 className="text-2xl font-bold text-gray-800">Kindling</h1>
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setShowReminders(!showReminders)}
+              className="w-9 h-9 rounded-full bg-white/60 backdrop-blur-sm flex items-center justify-center text-gray-500 hover:text-gray-700 hover:bg-white/80 transition-all"
+            >
+              <Bell className="w-4 h-4" />
+            </button>
+            <button
+              onClick={() => { setEditingHabit(undefined); setShowHabitForm(true); }}
+              className="w-9 h-9 rounded-full bg-orange-500 text-white flex items-center justify-center shadow-lg shadow-orange-200 hover:shadow-xl hover:scale-105 transition-all"
+            >
+              <Plus className="w-4 h-4" />
+            </button>
+          </div>
+        </motion.header>
+
+        {/* Today's progress */}
+        <motion.div
+          className="bg-white/70 backdrop-blur-md rounded-3xl p-5 shadow-lg border border-white/50 mb-4"
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.1 }}
+        >
+          <div className="flex items-center justify-between mb-3">
+            <div>
+              <h2 className="font-bold text-gray-800">Today</h2>
+              <p className="text-sm text-gray-500">{format(new Date(), 'EEEE, MMMM d')}</p>
+            </div>
+            <div className="text-right">
+              <div className="text-2xl font-bold text-gray-800">{todayProgress}%</div>
+              <div className="text-xs text-gray-400">{todayCompletedHabits.length}/{todayActiveHabits.length} done</div>
+            </div>
+          </div>
+          {/* Progress bar */}
+          <div className="h-3 bg-gray-100 rounded-full overflow-hidden">
+            <motion.div
+              className="h-full bg-gradient-to-r from-orange-400 to-amber-400 rounded-full"
+              initial={{ width: 0 }}
+              animate={{ width: `${todayProgress}%` }}
+              transition={{ type: 'spring', stiffness: 100, damping: 20 }}
+            />
+          </div>
+          {todayProgress === 100 && todayActiveHabits.length > 0 && (
+            <motion.div
+              className="mt-2 text-center text-sm text-emerald-600 font-medium"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+            >
+              🎉 All habits complete! Amazing day!
+            </motion.div>
+          )}
+        </motion.div>
+
+        {/* View toggle */}
+        <div className="flex gap-2 mb-4">
+          <button
+            onClick={() => setView('week')}
+            className={`flex-1 py-2.5 rounded-xl text-sm font-medium transition-all flex items-center justify-center gap-2 ${
+              view === 'week' ? 'bg-white shadow-md text-gray-800' : 'text-gray-500 hover:bg-white/50'
+            }`}
+          >
+            <Calendar className="w-4 h-4" /> Week
+          </button>
+          <button
+            onClick={() => setView('month')}
+            className={`flex-1 py-2.5 rounded-xl text-sm font-medium transition-all flex items-center justify-center gap-2 ${
+              view === 'month' ? 'bg-white shadow-md text-gray-800' : 'text-gray-500 hover:bg-white/50'
+            }`}
+          >
+            <BarChart3 className="w-4 h-4" /> Month
+          </button>
+        </div>
+
+        {/* Main views */}
+        <AnimatePresence mode="wait">
+          {view === 'week' ? (
+            <motion.div key="week" initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 20 }}>
+              <WeekView
+                habits={habits}
+                weekDays={weekDays}
+                todayStr={todayStr}
+                isHabitCompleted={isHabitCompleted}
+                isHabitActiveOnDate={isHabitActiveOnDate}
+                toggleHabit={toggleHabit}
+                getStreak={getStreak}
+              />
+            </motion.div>
+          ) : (
+            <motion.div key="month" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }}>
+              <MonthView
+                habits={habits}
+                logs={logs}
+                isHabitActiveOnDate={isHabitActiveOnDate}
+                isHabitCompleted={isHabitCompleted}
+              />
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* Water & Meals */}
+        <div className="grid grid-cols-1 gap-4 mt-4">
+          <WaterBottle
+            glasses={getWaterForDate(todayStr)}
+            goal={waterGoal}
+            onAdd={() => {
+              addWater(todayStr);
+              if (getWaterForDate(todayStr) + 1 >= waterGoal) {
+                confetti({ particleCount: 30, spread: 60, origin: { y: 0.7 }, colors: ['#0ea5e9', '#38bdf8', '#7dd3fc'] });
+              }
+            }}
+            onRemove={() => removeWater(todayStr)}
+          />
+          <MealTracker
+            meals={getMealsForDate(todayStr)}
+            onToggle={(meal) => toggleMeal(todayStr, meal)}
+          />
+        </div>
+
+        {/* Habit list with tap-to-detail */}
+        <motion.div
+          className="mt-4 bg-white/70 backdrop-blur-md rounded-3xl p-5 shadow-lg border border-white/50"
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.3 }}
+        >
+          <h3 className="font-bold text-gray-800 mb-3">Your Habits</h3>
+          <div className="space-y-2">
+            {habits.map(habit => (
+              <motion.button
+                key={habit.id}
+                onClick={() => setSelectedHabit(habit)}
+                className="w-full flex items-center gap-3 p-3 rounded-xl hover:bg-white/80 transition-all text-left group"
+                whileHover={{ x: 4 }}
+                whileTap={{ scale: 0.98 }}
+              >
+                <div className="w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: habit.color }} />
+                <div className="flex-1 min-w-0">
+                  <div className="text-sm font-medium text-gray-800 truncate">{habit.name}</div>
+                  <div className="text-xs text-gray-400 truncate">{habit.description}</div>
+                </div>
+                <div className="flex items-center gap-2 text-xs text-gray-400">
+                  {getStreak(habit.id) > 0 && (
+                    <span className="text-orange-500 font-medium">🔥{getStreak(habit.id)}</span>
+                  )}
+                  <span className="opacity-0 group-hover:opacity-100 transition-opacity">→</span>
+                </div>
+              </motion.button>
+            ))}
+          </div>
+        </motion.div>
+
+        {/* Footer */}
+        <div className="text-center text-xs text-gray-400 mt-8 pb-4">
+          Kindling — Light your daily fire 🍅
+        </div>
+      </div>
+
+      {/* Dialogs */}
+      <AnimatePresence>
+        {showHabitForm && (
+          <HabitFormDialog
+            habit={editingHabit}
+            onClose={() => { setShowHabitForm(false); setEditingHabit(undefined); }}
+            onSubmit={handleAddHabit}
+          />
+        )}
+        {selectedHabit && (
+          <HabitDetailDialog
+            habit={selectedHabit}
+            onClose={() => setSelectedHabit(null)}
+            getStreak={getStreak}
+            getBestStreak={getBestStreak}
+            getCompletionRate={getCompletionRate}
+            logs={logs}
+            isHabitActiveOnDate={isHabitActiveOnDate}
+            isHabitCompleted={isHabitCompleted}
+            onEdit={() => handleEditHabit(selectedHabit)}
+            onDelete={() => handleDeleteHabit(selectedHabit)}
+          />
+        )}
+      </AnimatePresence>
+
+      {/* Reminders panel */}
+      <AnimatePresence>
+        {showReminders && (
+          <motion.div
+            className="fixed inset-0 bg-black/30 backdrop-blur-sm flex items-center justify-center z-50 p-4"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={() => setShowReminders(false)}
+          >
+            <motion.div
+              className="bg-white rounded-3xl p-6 w-full max-w-sm shadow-2xl"
+              initial={{ scale: 0.9 }}
+              animate={{ scale: 1 }}
+              exit={{ scale: 0.9 }}
+              onClick={e => e.stopPropagation()}
+            >
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-lg font-bold text-gray-800">Reminders</h2>
+                <button onClick={() => setShowReminders(false)} className="p-1.5 rounded-lg hover:bg-gray-100">
+                  <X className="w-5 h-5 text-gray-400" />
+                </button>
+              </div>
+              
+              {reminders.length === 0 ? (
+                <p className="text-sm text-gray-400 text-center py-4">No reminders set yet.</p>
+              ) : (
+                <div className="space-y-2 mb-4">
+                  {reminders.map(r => (
+                    <div key={r.id} className="flex items-center gap-3 p-3 rounded-xl bg-gray-50">
+                      <button
+                        onClick={() => toggleReminder(r.id)}
+                        className={`w-8 h-8 rounded-full flex items-center justify-center ${r.enabled ? 'bg-orange-100 text-orange-500' : 'bg-gray-200 text-gray-400'}`}
+                      >
+                        <Bell className="w-4 h-4" />
+                      </button>
+                      <div className="flex-1">
+                        <div className="text-sm font-medium text-gray-700">{r.message}</div>
+                        <div className="text-xs text-gray-400">{r.time}</div>
+                      </div>
+                      <button onClick={() => deleteReminder(r.id)} className="p-1 text-gray-300 hover:text-red-400">
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              <button
+                onClick={() => {
+                  const habit = habits[0];
+                  if (habit) {
+                    addReminder({
+                      habitId: habit.id,
+                      time: '09:00',
+                      enabled: true,
+                      message: `Time for ${habit.name}!`,
+                    });
+                  }
+                }}
+                className="w-full py-2.5 rounded-xl bg-orange-50 text-orange-600 font-medium text-sm hover:bg-orange-100 transition-colors flex items-center justify-center gap-2"
+              >
+                <Plus className="w-4 h-4" /> Add Reminder
+              </button>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
