@@ -332,5 +332,31 @@ export interface AdaptiveSettings {
   maxTarget: number;
 }
 
+// Focus session
+export interface FocusSession {
+  id: string;
+  habitId: string;
+  startedAt: string;
+  duration: number; // in seconds
+  completedAt?: string;
+  interrupted?: boolean;
+}
+
+// Review
+export interface Review {
+  id: string;
+  type: 'daily' | 'weekly' | 'monthly';
+  date: string;
+  completed: boolean;
+  highlights: string[];
+  challenges: string[];
+  intentions: string[];
+  rating?: number;
+  createdAt: string;
+}
+
+// Tab types
+export type AppTab = 'home' | 'habits' | 'insights' | 'profile';
+
 export const MOOD_EMOJIS = ['😢', '😕', '😐', '😊', '😄'];
 export const MOOD_LABELS = ['Terrible', 'Bad', 'Okay', 'Good', 'Amazing'];

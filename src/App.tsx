@@ -9,7 +9,7 @@ import {
 } from 'lucide-react';
 import { useHabits } from './hooks/useHabits';
 import {
-  Habit, TimeOfDay, Weekday, HabitType, TrackingMode, ScheduleType, Theme,
+  Habit, TimeOfDay, Weekday, HabitType, TrackingMode, ScheduleType, Theme, AppTab,
   HABIT_COLORS, HABIT_ICONS, HABIT_CATEGORIES, HABIT_TEMPLATES,
   TIME_OF_DAY_LABELS, WEEKDAY_NAMES, MOOD_EMOJIS, MOOD_LABELS,
   GARDEN_PLANTS, THEMES, ACHIEVEMENTS,
@@ -1291,6 +1291,387 @@ function AdaptiveDifficultySettings({ settings, onUpdate }: {
   );
 }
 
+// ===== FOCUS MODE =====
+function FocusMode({ habit, onComplete, onCancel }: {
+  habit: Habit;
+  onComplete: () => void;
+  onCancel: () => void;
+}) {
+  const [timeLeft, setTimeLeft] = useState(habit.targetDuration ? habit.targetDuration * 60 : 1500); // 25 min default
+  const [isRunning, setIsRunning] = useState(false);
+  
+  useEffect(() => {
+    let interval: ReturnType<typeof setInterval>;
+    if (isRunning && timeLeft > 0) {
+      interval = setInterval(() => {
+        setTimeLeft(prev => prev - 1);
+      }, 1000);
+    } else if (timeLeft === 0) {
+      onComplete();
+    }
+    return () => clearInterval(interval);
+  }, [isRunning, timeLeft, onComplete]);
+  
+  const minutes = Math.floor(timeLeft / 60);
+  const seconds = timeLeft % 60;
+  const progress = habit.targetDuration ? ((habit.targetDuration * 60 - timeLeft) / (habit.targetDuration * 60)) * 100 : 0;
+  
+  return (
+    <motion.div
+      className="fixed inset-0 bg-gradient-to-br from-indigo-900 via-purple-900 to-pink-900 z-50 flex items-center justify-center p-4"
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+    >
+      <div className="max-w-md w-full text-center text-white">
+        <div className="mb-8">
+          <div className="text-6xl mb-4">{habit.icon}</div>
+          <h2 className="text-3xl font-bold mb-2">{habit.name}</h2>
+          <p className="text-white/70">{habit.description}</p>
+        </div>
+        
+        <div className="relative w-64 h-64 mx-auto mb-8">
+          <svg className="w-full h-full transform -rotate-90">
+            <circle
+              cx="128"
+              cy="128"
+              r="120"
+              stroke="rgba(255,255,255,0.1)"
+              strokeWidth="8"
+              fill="none"
+            />
+            <motion.circle
+              cx="128"
+              cy="128"
+              r="120"
+              stroke="url(#gradient)"
+              strokeWidth="8"
+              fill="none"
+              strokeLinecap="round"
+              strokeDasharray={2 * Math.PI * 120}
+              strokeDashoffset={2 * Math.PI * 120 * (1 - progress / 100)}
+              transition={{ duration: 0.5 }}
+            />
+            <defs>
+              <linearGradient id="gradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" stopColor="#f472b6" />
+                <stop offset="100%" stopColor="#818cf8" />
+              </linearGradient>
+            </defs>
+          </svg>
+          <div className="absolute inset-0 flex items-center justify-center">
+            <div className="text-5xl font-bold">
+              {String(minutes).padStart(2, '0')}:{String(seconds).padStart(2, '0')}
+            </div>
+          </div>
+        </div>
+        
+        <div className="flex gap-4 justify-center">
+          <motion.button
+            onClick={() => setIsRunning(!isRunning)}
+            className="px-8 py-4 bg-white/20 backdrop-blur-sm rounded-2xl font-semibold text-lg hover:bg-white/30 transition-colors"
+            whileTap={{ scale: 0.95 }}
+          >
+            {isRunning ? 'Pause' : timeLeft === (habit.targetDuration ? habit.targetDuration * 60 : 1500) ? 'Start' : 'Resume'}
+          </motion.button>
+          <motion.button
+            onClick={onCancel}
+            className="px-8 py-4 bg-white/10 backdrop-blur-sm rounded-2xl font-semibold text-lg hover:bg-white/20 transition-colors"
+            whileTap={{ scale: 0.95 }}
+          >
+            Cancel
+          </motion.button>
+        </div>
+        
+        <div className="mt-8 text-white/50 text-sm">
+          {isRunning ? 'Stay focused... 🧘' : 'Ready when you are'}
+        </div>
+      </div>
+    </motion.div>
+  );
+}
+
+// ===== BOTTOM NAVIGATION =====
+function BottomNavigation({ activeTab, onTabChange }: {
+  activeTab: AppTab;
+  onTabChange: (tab: AppTab) => void;
+}) {
+  const tabs: { id: AppTab; label: string; icon: string }[] = [
+    { id: 'home', label: 'Home', icon: '🏠' },
+    { id: 'habits', label: 'Habits', icon: '✓' },
+    { id: 'insights', label: 'Insights', icon: '📊' },
+    { id: 'profile', label: 'Profile', icon: '👤' },
+  ];
+  
+  return (
+    <div className="fixed bottom-0 left-0 right-0 bg-white/80 backdrop-blur-md border-t border-gray-200 z-40 safe-area-bottom">
+      <div className="max-w-lg mx-auto flex justify-around py-2">
+        {tabs.map(tab => (
+          <motion.button
+            key={tab.id}
+            onClick={() => onTabChange(tab.id)}
+            className={`flex flex-col items-center gap-1 px-4 py-2 rounded-xl transition-colors ${
+              activeTab === tab.id ? 'text-orange-600' : 'text-gray-500'
+            }`}
+            whileTap={{ scale: 0.9 }}
+          >
+            <span className="text-2xl">{tab.icon}</span>
+            <span className="text-xs font-medium">{tab.label}</span>
+            {activeTab === tab.id && (
+              <motion.div
+                className="absolute bottom-0 w-12 h-1 bg-orange-500 rounded-full"
+                layoutId="activeTab"
+              />
+            )}
+          </motion.button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ===== QUICK ACTIONS FAB =====
+function QuickActionsFAB({ onAction }: {
+  onAction: (action: 'focus' | 'review' | 'reflect') => void;
+}) {
+  const [isOpen, setIsOpen] = useState(false);
+  
+  const actions = [
+    { id: 'focus' as const, label: 'Focus Mode', icon: '🎯', color: 'bg-indigo-500' },
+    { id: 'review' as const, label: 'Quick Review', icon: '📝', color: 'bg-purple-500' },
+    { id: 'reflect' as const, label: 'Reflect', icon: '💭', color: 'bg-pink-500' },
+  ];
+  
+  return (
+    <div className="fixed bottom-24 right-4 z-30">
+      <AnimatePresence>
+        {isOpen && (
+          <motion.div
+            className="flex flex-col gap-3 mb-3"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 20 }}
+          >
+            {actions.map((action, idx) => (
+              <motion.button
+                key={action.id}
+                onClick={() => {
+                  onAction(action.id);
+                  setIsOpen(false);
+                }}
+                className={`${action.color} text-white px-4 py-3 rounded-2xl shadow-lg flex items-center gap-2 font-medium whitespace-nowrap`}
+                initial={{ opacity: 0, x: 20 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ delay: idx * 0.1 }}
+                whileTap={{ scale: 0.95 }}
+              >
+                <span className="text-xl">{action.icon}</span>
+                {action.label}
+              </motion.button>
+            ))}
+          </motion.div>
+        )}
+      </AnimatePresence>
+      
+      <motion.button
+        onClick={() => setIsOpen(!isOpen)}
+        className="w-14 h-14 bg-gradient-to-br from-orange-500 to-pink-500 rounded-full shadow-xl flex items-center justify-center text-white text-2xl"
+        whileTap={{ scale: 0.9 }}
+        animate={{ rotate: isOpen ? 45 : 0 }}
+      >
+        {isOpen ? '✕' : '+'}
+      </motion.button>
+    </div>
+  );
+}
+
+// ===== SWIPEABLE HABIT CARD =====
+function SwipeableHabitCard({ habit, onSwipeRight, onSwipeLeft, children }: {
+  habit: Habit;
+  onSwipeRight: () => void;
+  onSwipeLeft: () => void;
+  children: React.ReactNode;
+}) {
+  const [dragX, setDragX] = useState(0);
+  
+  return (
+    <motion.div
+      className="relative"
+      drag="x"
+      dragConstraints={{ left: -100, right: 100 }}
+      onDragEnd={(e, { offset, velocity }) => {
+        if (offset.x > 80) {
+          onSwipeRight();
+        } else if (offset.x < -80) {
+          onSwipeLeft();
+        }
+        setDragX(0);
+      }}
+      animate={{ x: dragX }}
+    >
+      {/* Right swipe indicator */}
+      {dragX > 0 && (
+        <div className="absolute left-0 top-0 bottom-0 w-20 bg-green-500 rounded-l-2xl flex items-center justify-center text-white">
+          <Check className="w-8 h-8" />
+        </div>
+      )}
+      
+      {/* Left swipe indicator */}
+      {dragX < 0 && (
+        <div className="absolute right-0 top-0 bottom-0 w-20 bg-red-500 rounded-r-2xl flex items-center justify-center text-white">
+          <X className="w-8 h-8" />
+        </div>
+      )}
+      
+      <motion.div
+        className="bg-white/70 backdrop-blur-md rounded-2xl p-4 shadow-lg"
+        style={{ x: dragX }}
+      >
+        {children}
+      </motion.div>
+    </motion.div>
+  );
+}
+
+// ===== REVIEW FLOW =====
+function ReviewFlow({ type, onComplete, onCancel }: {
+  type: 'daily' | 'weekly' | 'monthly';
+  onComplete: (highlights: string[], challenges: string[], intentions: string[], rating?: number) => void;
+  onCancel: () => void;
+}) {
+  const [step, setStep] = useState(0);
+  const [highlights, setHighlights] = useState('');
+  const [challenges, setChallenges] = useState('');
+  const [intentions, setIntentions] = useState('');
+  const [rating, setRating] = useState<number | undefined>();
+  
+  const steps = [
+    {
+      title: type === 'daily' ? 'How was your day?' : type === 'weekly' ? 'How was your week?' : 'How was your month?',
+      content: (
+        <div className="space-y-4">
+          <div className="flex justify-center gap-2">
+            {[1, 2, 3, 4, 5].map(r => (
+              <motion.button
+                key={r}
+                onClick={() => setRating(r)}
+                className={`text-4xl p-2 rounded-xl ${rating === r ? 'bg-orange-100 scale-110' : 'hover:bg-gray-100'}`}
+                whileTap={{ scale: 0.9 }}
+              >
+                {['😢', '😕', '😐', '😊', '😄'][r - 1]}
+              </motion.button>
+            ))}
+          </div>
+        </div>
+      ),
+    },
+    {
+      title: 'What went well?',
+      content: (
+        <textarea
+          value={highlights}
+          onChange={(e) => setHighlights(e.target.value)}
+          placeholder="Celebrate your wins, no matter how small..."
+          className="w-full p-3 border border-gray-200 rounded-xl text-sm resize-none"
+          rows={4}
+          autoFocus
+        />
+      ),
+    },
+    {
+      title: 'What was challenging?',
+      content: (
+        <textarea
+          value={challenges}
+          onChange={(e) => setChallenges(e.target.value)}
+          placeholder="What obstacles did you face?"
+          className="w-full p-3 border border-gray-200 rounded-xl text-sm resize-none"
+          rows={4}
+          autoFocus
+        />
+      ),
+    },
+    {
+      title: 'What are your intentions?',
+      content: (
+        <textarea
+          value={intentions}
+          onChange={(e) => setIntentions(e.target.value)}
+          placeholder="What do you want to focus on next?"
+          className="w-full p-3 border border-gray-200 rounded-xl text-sm resize-none"
+          rows={4}
+          autoFocus
+        />
+      ),
+    },
+  ];
+  
+  const handleNext = () => {
+    if (step < steps.length - 1) {
+      setStep(step + 1);
+    } else {
+      onComplete(
+        highlights.split('\n').filter(h => h.trim()),
+        challenges.split('\n').filter(c => c.trim()),
+        intentions.split('\n').filter(i => i.trim()),
+        rating
+      );
+    }
+  };
+  
+  return (
+    <motion.div
+      className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+    >
+      <motion.div
+        className="bg-white rounded-3xl p-6 w-full max-w-md shadow-2xl"
+        initial={{ scale: 0.9, y: 20 }}
+        animate={{ scale: 1, y: 0 }}
+        exit={{ scale: 0.9, y: 20 }}
+      >
+        <div className="flex items-center justify-between mb-6">
+          <h2 className="text-xl font-bold text-gray-800">{steps[step].title}</h2>
+          <button onClick={onCancel} className="p-1.5 rounded-lg hover:bg-gray-100">
+            <X className="w-5 h-5 text-gray-400" />
+          </button>
+        </div>
+        
+        <div className="mb-6">
+          <div className="flex gap-1 mb-4">
+            {steps.map((_, idx) => (
+              <div
+                key={idx}
+                className={`flex-1 h-1 rounded-full ${idx <= step ? 'bg-orange-500' : 'bg-gray-200'}`}
+              />
+            ))}
+          </div>
+          {steps[step].content}
+        </div>
+        
+        <div className="flex gap-2">
+          {step > 0 && (
+            <button
+              onClick={() => setStep(step - 1)}
+              className="flex-1 py-3 bg-gray-100 text-gray-700 rounded-xl font-medium hover:bg-gray-200 transition-colors"
+            >
+              Back
+            </button>
+          )}
+          <button
+            onClick={handleNext}
+            className="flex-1 py-3 bg-gradient-to-r from-orange-500 to-pink-500 text-white rounded-xl font-medium hover:shadow-lg transition-shadow"
+          >
+            {step === steps.length - 1 ? 'Complete' : 'Next'}
+          </button>
+        </div>
+      </motion.div>
+    </motion.div>
+  );
+}
+
 // ===== WATER BOTTLE =====
 function WaterBottle({ glasses, goal, onAdd, onRemove }: { glasses: number; goal: number; onAdd: () => void; onRemove: () => void }) {
   const fillPercent = Math.min((glasses / goal) * 100, 100);
@@ -2095,6 +2476,10 @@ export default function App() {
     triggerStreakRecovery, markStreakRecovered,
     calculateCorrelations,
     adaptHabitDifficulty, updateAdaptiveSettings,
+    // Phase 5 features
+    activeTab, currentFocusSession,
+    setActiveTab, startFocusSession, completeFocusSession, cancelFocusSession,
+    createReview, shouldShowReview,
   } = useHabits();
 
   const [view, setView] = useState<'week' | 'month' | 'analytics'>('week');
@@ -2112,6 +2497,10 @@ export default function App() {
   const [showArchived, setShowArchived] = useState(false);
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [selectedSound, setSelectedSound] = useState('default');
+  const [showFocusMode, setShowFocusMode] = useState(false);
+  const [focusHabit, setFocusHabit] = useState<Habit | null>(null);
+  const [showReviewFlow, setShowReviewFlow] = useState(false);
+  const [reviewType, setReviewType] = useState<'daily' | 'weekly' | 'monthly'>('daily');
   const [challenges, setChallenges] = useState([
     { id: '1', name: '7-Day Mindfulness', icon: '🧘', days: 7, description: 'Meditate every day for a week', category: 'Mind', joined: false, progress: 0 },
     { id: '2', name: '21-Day Fitness', icon: '💪', days: 21, description: 'Build an exercise habit', category: 'Fitness', joined: false, progress: 0 },
@@ -2131,6 +2520,47 @@ export default function App() {
     ));
     addXp(100);
     confetti({ particleCount: 100, spread: 70, origin: { y: 0.6 } });
+  };
+
+  const handleStartFocus = (habit: Habit) => {
+    setFocusHabit(habit);
+    setShowFocusMode(true);
+    startFocusSession(habit.id, habit.targetDuration ? habit.targetDuration * 60 : 1500);
+  };
+
+  const handleCompleteFocus = () => {
+    completeFocusSession();
+    setShowFocusMode(false);
+    setFocusHabit(null);
+    confetti({ particleCount: 150, spread: 100, origin: { y: 0.5 } });
+  };
+
+  const handleCancelFocus = () => {
+    cancelFocusSession();
+    setShowFocusMode(false);
+    setFocusHabit(null);
+  };
+
+  const handleStartReview = (type: 'daily' | 'weekly' | 'monthly') => {
+    setReviewType(type);
+    setShowReviewFlow(true);
+  };
+
+  const handleCompleteReview = (highlights: string[], challenges: string[], intentions: string[], rating?: number) => {
+    createReview(reviewType, highlights, challenges, intentions, rating);
+    setShowReviewFlow(false);
+    addXp(50);
+  };
+
+  const handleQuickAction = (action: 'focus' | 'review' | 'reflect') => {
+    if (action === 'focus' && todayActiveHabits.length > 0) {
+      handleStartFocus(todayActiveHabits[0]);
+    } else if (action === 'review') {
+      handleStartReview('daily');
+    } else if (action === 'reflect') {
+      // Could open reflection dialog
+      console.log('Open reflection');
+    }
   };
 
   const greeting = useMemo(() => {
@@ -2641,10 +3071,38 @@ export default function App() {
           )}
         </AnimatePresence>
 
-        <div className={`text-center text-xs ${darkMode ? 'text-gray-600' : 'text-gray-400'} mt-4 pb-4`}>
+        <div className={`text-center text-xs ${darkMode ? 'text-gray-600' : 'text-gray-400'} mt-4 pb-20`}>
           Kindling — Light your daily fire 🔥
         </div>
       </div>
+
+      {/* Focus Mode */}
+      <AnimatePresence>
+        {showFocusMode && focusHabit && (
+          <FocusMode
+            habit={focusHabit}
+            onComplete={handleCompleteFocus}
+            onCancel={handleCancelFocus}
+          />
+        )}
+      </AnimatePresence>
+
+      {/* Review Flow */}
+      <AnimatePresence>
+        {showReviewFlow && (
+          <ReviewFlow
+            type={reviewType}
+            onComplete={handleCompleteReview}
+            onCancel={() => setShowReviewFlow(false)}
+          />
+        )}
+      </AnimatePresence>
+
+      {/* Bottom Navigation */}
+      <BottomNavigation activeTab={activeTab} onTabChange={setActiveTab} />
+
+      {/* Quick Actions FAB */}
+      <QuickActionsFAB onAction={handleQuickAction} />
 
       {/* Dialogs */}
       <AnimatePresence>

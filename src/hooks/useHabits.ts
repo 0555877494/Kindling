@@ -3,7 +3,7 @@ import { useLocalStorage } from './useLocalStorage';
 import {
   Habit, HabitLog, WaterLog, MealLog, MoodLog, Reminder, HabitNote,
   Weekday, Theme, UserStats, Achievement, StreakShield, GardenPlant, TimeCapsule, Reflection,
-  HabitStack, StreakRecovery, HabitCorrelation, AdaptiveSettings,
+  HabitStack, StreakRecovery, HabitCorrelation, AdaptiveSettings, FocusSession, Review, AppTab,
   ACHIEVEMENTS, GARDEN_PLANTS,
 } from '../types';
 import { format, subDays, startOfWeek, addDays, differenceInCalendarDays } from 'date-fns';
@@ -120,6 +120,12 @@ export function useHabits() {
     minTarget: 1,
     maxTarget: 100,
   });
+  
+  // Phase 5 features
+  const [focusSessions, setFocusSessions] = useLocalStorage<FocusSession[]>('kindling-focus', []);
+  const [reviews, setReviews] = useLocalStorage<Review[]>('kindling-reviews', []);
+  const [activeTab, setActiveTab] = useState<AppTab>('home');
+  const [currentFocusSession, setCurrentFocusSession] = useState<FocusSession | null>(null);
 
   // XP and Level
   const calculateLevel = (xp: number): number => Math.floor(Math.sqrt(xp / 100)) + 1;
@@ -776,6 +782,104 @@ export function useHabits() {
     setAdaptiveSettings(prev => ({ ...prev, ...settings }));
   }, [setAdaptiveSettings]);
 
+  // Focus Mode
+  const startFocusSession = useCallback((habitId: string, duration: number) => {
+    const session: FocusSession = {
+      id: uuidv4(),
+      habitId,
+      startedAt: new Date().toISOString(),
+      duration,
+    };
+    setCurrentFocusSession(session);
+    return session;
+  }, []);
+
+  const completeFocusSession = useCallback(() => {
+    if (!currentFocusSession) return;
+    
+    const completedSession = {
+      ...currentFocusSession,
+      completedAt: new Date().toISOString(),
+    };
+    
+    setFocusSessions(prev => [...prev, completedSession]);
+    setCurrentFocusSession(null);
+    
+    // Mark habit as completed for today
+    const today = format(new Date(), 'yyyy-MM-dd');
+    toggleHabit(currentFocusSession.habitId, today);
+    
+    return completedSession;
+  }, [currentFocusSession, setFocusSessions, toggleHabit]);
+
+  const cancelFocusSession = useCallback(() => {
+    if (!currentFocusSession) return;
+    
+    const cancelledSession = {
+      ...currentFocusSession,
+      completedAt: new Date().toISOString(),
+      interrupted: true,
+    };
+    
+    setFocusSessions(prev => [...prev, cancelledSession]);
+    setCurrentFocusSession(null);
+  }, [currentFocusSession, setFocusSessions]);
+
+  const getFocusStats = useCallback(() => {
+    const totalSessions = focusSessions.filter(s => !s.interrupted).length;
+    const totalMinutes = focusSessions
+      .filter(s => !s.interrupted)
+      .reduce((sum, s) => sum + Math.floor(s.duration / 60), 0);
+    
+    return { totalSessions, totalMinutes };
+  }, [focusSessions]);
+
+  // Reviews
+  const createReview = useCallback((
+    type: 'daily' | 'weekly' | 'monthly',
+    highlights: string[],
+    challenges: string[],
+    intentions: string[],
+    rating?: number
+  ) => {
+    const review: Review = {
+      id: uuidv4(),
+      type,
+      date: format(new Date(), 'yyyy-MM-dd'),
+      completed: true,
+      highlights,
+      challenges,
+      intentions,
+      rating,
+      createdAt: new Date().toISOString(),
+    };
+    
+    setReviews(prev => [...prev, review]);
+    return review;
+  }, [setReviews]);
+
+  const getLatestReview = useCallback((type: 'daily' | 'weekly' | 'monthly') => {
+    return reviews
+      .filter(r => r.type === type)
+      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())[0];
+  }, [reviews]);
+
+  const shouldShowReview = useCallback((type: 'daily' | 'weekly' | 'monthly') => {
+    const latest = getLatestReview(type);
+    if (!latest) return true;
+    
+    const lastReview = new Date(latest.createdAt);
+    const now = new Date();
+    const hoursDiff = (now.getTime() - lastReview.getTime()) / (1000 * 60 * 60);
+    
+    switch (type) {
+      case 'daily': return hoursDiff >= 24;
+      case 'weekly': return hoursDiff >= 24 * 7;
+      case 'monthly': return hoursDiff >= 24 * 30;
+      default: return false;
+    }
+  }, [getLatestReview]);
+
   // Today's progress
   const todayStr = format(new Date(), 'yyyy-MM-dd');
   const activeHabits = habits.filter(h => !h.archived);
@@ -816,5 +920,9 @@ export function useHabits() {
     triggerStreakRecovery, markStreakRecovered,
     calculateCorrelations,
     adaptHabitDifficulty, updateAdaptiveSettings,
+    // Phase 5 features
+    focusSessions, reviews, activeTab, currentFocusSession,
+    setActiveTab, startFocusSession, completeFocusSession, cancelFocusSession,
+    getFocusStats, createReview, getLatestReview, shouldShowReview,
   };
 }
