@@ -124,7 +124,6 @@ export function useHabits() {
   // Phase 5 features
   const [focusSessions, setFocusSessions] = useLocalStorage<FocusSession[]>('kindling-focus', []);
   const [reviews, setReviews] = useLocalStorage<Review[]>('kindling-reviews', []);
-  const [activeTab, setActiveTab] = useState<AppTab>('home');
   const [currentFocusSession, setCurrentFocusSession] = useState<FocusSession | null>(null);
 
   // XP and Level
@@ -921,8 +920,8 @@ export function useHabits() {
     calculateCorrelations,
     adaptHabitDifficulty, updateAdaptiveSettings,
     // Phase 5 features
-    focusSessions, reviews, activeTab, currentFocusSession,
-    setActiveTab, startFocusSession, completeFocusSession, cancelFocusSession,
+    focusSessions, reviews, currentFocusSession,
+    startFocusSession, completeFocusSession, cancelFocusSession,
     getFocusStats, createReview, getLatestReview, shouldShowReview,
   };
 }

@@ -2477,10 +2477,12 @@ export default function App() {
     calculateCorrelations,
     adaptHabitDifficulty, updateAdaptiveSettings,
     // Phase 5 features
-    activeTab, currentFocusSession,
-    setActiveTab, startFocusSession, completeFocusSession, cancelFocusSession,
+    currentFocusSession,
+    startFocusSession, completeFocusSession, cancelFocusSession,
     createReview, shouldShowReview,
   } = useHabits();
+  
+  const [activeTab, setActiveTab] = useState<AppTab>('home');
 
   const [view, setView] = useState<'week' | 'month' | 'analytics'>('week');
   const [showHabitForm, setShowHabitForm] = useState(false);
